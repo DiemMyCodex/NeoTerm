@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 14dp close glyph; tinted per active/inactive state by the adapter. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="14dp"
+    android:height="14dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M2.1,1.4L7,6.3L11.9,1.4L12.6,2.1L7.7,7L12.6,11.9L11.9,12.6L7,7.7L2.1,12.6L1.4,11.9L6.3,7L1.4,2.1Z" />
+</vector>

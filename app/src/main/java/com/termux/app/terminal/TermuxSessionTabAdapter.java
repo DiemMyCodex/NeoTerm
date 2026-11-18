@@ -1,7 +1,9 @@
 package com.termux.app.terminal;
 
+import android.content.res.ColorStateList;
 import android.graphics.Color;
-import android.util.TypedValue;
+import android.graphics.Rect;
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,8 +12,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
-import androidx.core.graphics.ColorUtils;
+import androidx.core.widget.ImageViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -24,7 +25,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Adapter for the persistent top session tab bar.
+ * Adapter for the floating top session tab bar.
  *
  * <p>The backing list is the exact list owned by {@link com.termux.app.TermuxService}
  * ({@code TermuxService#getTermuxSessions()}). This adapter never copies or owns session state,
@@ -35,42 +36,47 @@ import java.util.List;
  */
 public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionTabAdapter.TabViewHolder> {
 
+    private static final int ACTIVE_TEXT_COLOR = Color.parseColor("#09090B");
+    private static final int INACTIVE_TEXT_COLOR = Color.parseColor("#A1A1AA");
+    private static final int ACTIVE_CLOSE_COLOR = Color.parseColor("#52525B");
+    private static final int INACTIVE_CLOSE_COLOR = Color.parseColor("#71717A");
+
     private final TermuxActivity mActivity;
     private List<TermuxSession> mSessions = Collections.emptyList();
-    private final int mTextColor;
-    private final int mActiveBackgroundColor;
-    private final int mInactiveTextColor;
+    private RecyclerView mRecyclerView;
     private int mLastItemCount;
+    private int mLastActivePosition = -1;
 
     public TermuxSessionTabAdapter(@NonNull TermuxActivity activity) {
         mActivity = activity;
-
-        TypedValue typedValue = new TypedValue();
-        int color = Color.WHITE;
-        if (activity.getTheme().resolveAttribute(R.attr.termuxActivityDrawerImageTint, typedValue, true)) {
-            if (typedValue.type >= TypedValue.TYPE_FIRST_COLOR_INT && typedValue.type <= TypedValue.TYPE_LAST_COLOR_INT)
-                color = typedValue.data;
-            else if (typedValue.resourceId != 0)
-                color = ContextCompat.getColor(activity, typedValue.resourceId);
-        }
-
-        mTextColor = color;
-        mActiveBackgroundColor = ColorUtils.setAlphaComponent(color, 38);
-        mInactiveTextColor = ColorUtils.setAlphaComponent(color, 160);
     }
 
     /** Bind to the service-owned session list. Call once after the service connects. */
     public void setSessions(@Nullable List<TermuxSession> sessions) {
         mSessions = sessions == null ? Collections.emptyList() : sessions;
+        mLastActivePosition = -1;
         notifyDataSetChanged();
     }
 
-    /** Wire the adapter to the horizontal RecyclerView and auto-scroll on newly added tabs. */
+    /** Wire the adapter to the horizontal RecyclerView, spacing and spring animator. */
     public void attachTo(@NonNull final RecyclerView recyclerView) {
+        mRecyclerView = recyclerView;
         recyclerView.setLayoutManager(new LinearLayoutManager(mActivity, LinearLayoutManager.HORIZONTAL, false));
+        recyclerView.setItemAnimator(new SessionTabItemAnimator());
         recyclerView.setAdapter(this);
         recyclerView.setFocusable(false);
         recyclerView.setFocusableInTouchMode(false);
+
+        final int gapPx = Math.round(6 * recyclerView.getResources().getDisplayMetrics().density);
+        recyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
+            @Override
+            public void getItemOffsets(@NonNull Rect outRect, @NonNull View view,
+                                       @NonNull RecyclerView parent, @NonNull RecyclerView.State state) {
+                int position = parent.getChildAdapterPosition(view);
+                outRect.left = position > 0 ? gapPx : 0;
+            }
+        });
+
         mLastItemCount = getItemCount();
 
         registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
@@ -98,6 +104,13 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         });
     }
 
+    /** Keep the currently selected pill visible after creation or switch. */
+    private void scrollToActiveTab(int position) {
+        if (position < 0 || position == mLastActivePosition || mRecyclerView == null) return;
+        mLastActivePosition = position;
+        mRecyclerView.post(() -> mRecyclerView.smoothScrollToPosition(position));
+    }
+
     @NonNull
     @Override
     public TabViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -112,9 +125,13 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         boolean isActive = session != null && session == current;
 
         holder.itemView.setSelected(isActive);
-        holder.itemView.setBackgroundColor(isActive ? mActiveBackgroundColor : Color.TRANSPARENT);
-        holder.title.setTextColor(isActive ? mTextColor : mInactiveTextColor);
+        holder.title.setTextColor(isActive ? ACTIVE_TEXT_COLOR : INACTIVE_TEXT_COLOR);
+        holder.title.setTypeface(null, isActive ? Typeface.BOLD : Typeface.NORMAL);
         holder.title.setText(buildLabel(position, session));
+        ImageViewCompat.setImageTintList(holder.close,
+            ColorStateList.valueOf(isActive ? ACTIVE_CLOSE_COLOR : INACTIVE_CLOSE_COLOR));
+
+        if (isActive) scrollToActiveTab(position);
     }
 
     @Override
@@ -153,9 +170,10 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
             title = itemView.findViewById(R.id.session_tab_title);
             close = itemView.findViewById(R.id.session_tab_close);
 
-            // Belt-and-braces: layout already declares these, enforce in code too.
+            // Belt-and-braces: the layout already declares these, enforce in code too.
             itemView.setFocusable(false);
             itemView.setFocusableInTouchMode(false);
+            itemView.setOnTouchListener(new TactilePressTouchListener());
             title.setFocusable(false);
             title.setFocusableInTouchMode(false);
             close.setFocusable(false);
@@ -166,7 +184,7 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
                 TerminalSession session = getTerminalSessionAt(position);
                 if (session == null) return;
                 mActivity.getTermuxTerminalSessionClient().setCurrentSession(session);
-                mActivity.restoreTerminalFocus();
+                mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
             });
 
             close.setOnClickListener(v -> {
@@ -174,7 +192,7 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
                 TerminalSession session = getTerminalSessionAt(position);
                 if (session == null) return;
                 mActivity.getTermuxTerminalSessionClient().closeSession(session);
-                mActivity.restoreTerminalFocus();
+                mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
             });
         }
     }

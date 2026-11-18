@@ -35,17 +35,22 @@ public class SpecialButtonState {
         isCreated = value;
     }
 
-    /** Set {@link #isActive}. */
+    /** Set {@link #isActive} and refresh the keycap appearance. */
     public void setIsActive(boolean value) {
         isActive = value;
-        for (MaterialButton button : buttons) {
-            button.setTextColor(value ? mExtraKeysView.getButtonActiveTextColor() : mExtraKeysView.getButtonTextColor());
-        }
+        refreshKeycaps();
     }
 
-    /** Set {@link #isLocked}. */
+    /** Set {@link #isLocked} and refresh the keycap appearance. */
     public void setIsLocked(boolean value) {
         isLocked = value;
+        refreshKeycaps();
+    }
+
+    /** Locked wins over active so a one-shot press cannot visually unlock a latched modifier. */
+    private void refreshKeycaps() {
+        for (MaterialButton button : buttons)
+            mExtraKeysView.applyKeycapStyle(button, isActive, isLocked);
     }
 
 }

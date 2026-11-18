@@ -293,15 +293,21 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     public void setCurrentSession(TerminalSession session) {
         if (session == null) return;
 
-        if (mActivity.getTerminalView().attachSession(session)) {
+        boolean sessionChanged = mActivity.getTerminalView().attachSession(session);
+        if (sessionChanged) {
             // notify about switched session if not already displaying the session
             notifyOfSessionChange();
+            // Cross-fade + repaint the active pill on every shell switch.
+            mActivity.onTerminalSessionSwitched();
         }
 
         // We call the following even when the session is already being displayed since config may
         // be stale, like current session not selected or scrolled to.
         checkAndScrollToSession(session);
         updateBackgroundColor();
+
+        // Creating or switching sessions must never leave focus/keyboard on the chrome.
+        mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
     }
 
     void notifyOfSessionChange() {
@@ -381,6 +387,9 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         termuxSessionListNotifyUpdated();
 
         if (service.getTermuxSessionsSize() == 0) addNewSession(false, null);
+
+        // Closing a tab (even an inactive one) must hand focus back to the terminal.
+        mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
     }
 
     @SuppressLint("InflateParams")

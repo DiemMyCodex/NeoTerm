@@ -21,6 +21,8 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
@@ -31,6 +33,7 @@ import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
+import com.termux.app.terminal.TactilePressTouchListener;
 import com.termux.app.terminal.TermuxSessionTabAdapter;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.shared.activities.ReportActivity;
@@ -55,6 +58,7 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.settings.properties.TermuxAppSharedProperties;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
+import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -202,6 +206,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private static final String LOG_TAG = "TermuxActivity";
 
+    /** Cross-fade duration when a different shell is attached to the terminal view. */
+    private static final long SESSION_SWITCH_FADE_MS = 110L;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Logger.logDebug(LOG_TAG, "onCreate");
@@ -324,6 +331,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
+
+        // The tab bar and extra keys are non-focusable chrome; explicitly reclaim focus and
+        // re-trigger the IME on every foreground transition. #keyboard-regression
+        restoreTerminalFocusAndIme(shouldRestoreIme());
 
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
@@ -532,19 +543,60 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         View newSessionTabButton = findViewById(R.id.new_session_tab_button);
         if (newSessionTabButton != null) {
+            newSessionTabButton.setOnTouchListener(new TactilePressTouchListener());
             newSessionTabButton.setOnClickListener(v -> {
                 mTermuxTerminalSessionActivityClient.addNewSession(false, null);
-                restoreTerminalFocus();
+                restoreTerminalFocusAndIme(shouldRestoreIme());
             });
         }
     }
 
     /**
-     * Restore focus to {@link #mTerminalView} only if it actually lost it. Calling requestFocus()
-     * on an already-focused view fires no focus change, so the soft keyboard stays put.
+     * Single entry point for reclaiming terminal focus after any chrome interaction.
+     * requestFocus() is unconditional: calling it on an already-focused view fires no focus
+     * change, so the IME is posted explicitly when {@code showIme} is true.
      */
+    public void restoreTerminalFocusAndIme(boolean showIme) {
+        if (mTerminalView == null) return;
+
+        mTerminalView.requestFocus();
+
+        if (showIme) {
+            mTerminalView.post(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(mTerminalView, InputMethodManager.SHOW_IMPLICIT);
+            });
+        }
+    }
+
+    /** Kept for callers that only need focus, never an IME show. */
     public void restoreTerminalFocus() {
-        if (mTerminalView != null && !mTerminalView.hasFocus()) mTerminalView.requestFocus();
+        restoreTerminalFocusAndIme(false);
+    }
+
+    /** Respect the user's soft-keyboard preferences before force-showing the IME. */
+    public boolean shouldRestoreIme() {
+        if (KeyboardUtils.areDisableSoftKeyboardFlagsSet(this)) return false;
+        if (mPreferences != null && !mPreferences.isSoftKeyboardEnabled()) return false;
+        return mProperties == null || !mProperties.shouldSoftKeyboardBeHiddenOnStartup();
+    }
+
+    /**
+     * Called by the session client whenever a different shell is attached. Runs the subtle
+     * cross-fade, repaints the active tab and re-asserts focus after the switch.
+     */
+    public void onTerminalSessionSwitched() {
+        if (mTerminalView == null) return;
+
+        if (mSessionTabAdapter != null) mSessionTabAdapter.notifyDataSetChanged();
+
+        mTerminalView.animate().cancel();
+        mTerminalView.setAlpha(0.88f);
+        mTerminalView.animate()
+            .alpha(1f)
+            .setDuration(SESSION_SWITCH_FADE_MS)
+            .setInterpolator(new DecelerateInterpolator())
+            .start();
     }
 
 

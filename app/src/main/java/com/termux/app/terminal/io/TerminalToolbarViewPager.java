@@ -105,7 +105,7 @@ public class TerminalToolbarViewPager {
         @Override
         public void onPageSelected(int position) {
             if (position == 0) {
-                mActivity.getTerminalView().requestFocus();
+                mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
             } else {
                 final EditText editText = mTerminalToolbarViewPager.findViewById(R.id.terminal_toolbar_text_input);
                 if (editText != null) editText.requestFocus();
