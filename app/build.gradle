@@ -46,11 +46,8 @@ android {
         versionCode 118
         versionName "0.118.0"
 
-        // NeoTerm targets ARM64 (POCO HyperOS) only. This keeps native libs and
-        // bootstraps limited to arm64-v8a instead of shipping unused ABIs.
-        ndk {
-            abiFilters "arm64-v8a"
-        }
+        // ARM64-only is enforced by splits.abi below and by Application.mk (APP_ABI),
+        // so no ndk.abiFilters here: AGP rejects combining it with splits.abi.
 
         if (appVersionName) versionName = appVersionName
         validateVersionName(versionName)
