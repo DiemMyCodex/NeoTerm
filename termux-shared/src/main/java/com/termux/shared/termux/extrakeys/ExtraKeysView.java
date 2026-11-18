@@ -122,7 +122,7 @@ public final class ExtraKeysView extends GridLayout {
     public static final int ATTR_BUTTON_ACTIVE_BACKGROUND_COLOR = R.attr.extraKeysButtonActiveBackgroundColor;
 
     /** Defines the default fallback value for {@link #mButtonTextColor} if {@link #ATTR_BUTTON_TEXT_COLOR} is undefined. */
-    public static final int DEFAULT_BUTTON_TEXT_COLOR = 0xFFFFFFFF;
+    public static final int DEFAULT_BUTTON_TEXT_COLOR = 0xFFF4F4F5;
     /** Defines the default fallback value for {@link #mButtonActiveTextColor} if {@link #ATTR_BUTTON_ACTIVE_TEXT_COLOR} is undefined. */
     public static final int DEFAULT_BUTTON_ACTIVE_TEXT_COLOR = 0xFF80DEEA;
     /** Defines the default fallback value for {@link #mButtonBackgroundColor} if {@link #ATTR_BUTTON_BACKGROUND_COLOR} is undefined. */
@@ -479,14 +479,14 @@ public final class ExtraKeysView extends GridLayout {
                     if (state != null) applyKeycapStyle(button, state.isActive, state.isLocked);
                 }
 
-                button.setOnClickListener(view -> {
-                    performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
-                    onAnyExtraKeyButtonClick(view, buttonInfo, button);
-                });
+                button.setOnClickListener(view -> onAnyExtraKeyButtonClick(view, buttonInfo, button));
 
                 button.setOnTouchListener((view, event) -> {
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
+                            // One crisp tick per physical press, including modifier locks and
+                            // swipe-up popup keys. Auto-repeat adds its own ticks below.
+                            performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
                             setKeycapPressed(view, buttonInfo, true);
                             // Start long press scheduled executors which will be stopped in next MotionEvent
                             startScheduledExecutors(view, buttonInfo, button);
@@ -607,6 +607,7 @@ public final class ExtraKeysView extends GridLayout {
             mScheduledExecutor = Executors.newSingleThreadScheduledExecutor();
             mScheduledExecutor.scheduleWithFixedDelay(() -> {
                 mLongPressCount++;
+                view.post(() -> performExtraKeyButtonHapticFeedback(view, buttonInfo, button));
                 onExtraKeyButtonClick(view, buttonInfo, button);
             }, mLongPressTimeout, mLongPressRepeatDelay, TimeUnit.MILLISECONDS);
         } else if (isSpecialButton(buttonInfo)) {

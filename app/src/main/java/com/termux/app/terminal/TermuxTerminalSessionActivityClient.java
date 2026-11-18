@@ -35,6 +35,8 @@ import com.termux.terminal.TextStyle;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 /** The {@link TerminalSessionClient} implementation that may require an {@link Activity} for its interface methods. */
@@ -392,6 +394,52 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
     }
 
+    /** Duplicate a shell at the same working directory, keeping the service as the list owner. */
+    public void duplicateSession(@Nullable TerminalSession source) {
+        TermuxService service = mActivity.getTermuxService();
+        if (source == null || service == null) return;
+
+        if (service.getTermuxSessionsSize() >= MAX_SESSIONS) {
+            new AlertDialog.Builder(mActivity).setTitle(R.string.title_max_terminals_reached)
+                .setMessage(R.string.msg_max_terminals_reached)
+                .setPositiveButton(android.R.string.ok, null).show();
+            return;
+        }
+
+        String workingDirectory = source.getCwd();
+        if (workingDirectory == null) workingDirectory = mActivity.getProperties().getDefaultWorkingDirectory();
+
+        String sourceName = source.mSessionName;
+        String newName = TextUtils.isEmpty(sourceName) ? null : sourceName + " copy";
+
+        TermuxSession newTermuxSession = service.createTermuxSession(null, null, null,
+            workingDirectory, false, newName);
+        if (newTermuxSession == null) return;
+
+        setCurrentSession(newTermuxSession.getTerminalSession());
+    }
+
+    /** Keep only the long-pressed tab, reusing the existing kill/remove lifecycle. */
+    public void closeOtherSessions(@Nullable TerminalSession keep) {
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
+
+        // Snapshot first: killIfExecuting() mutates the service-owned list via callbacks.
+        List<TermuxSession> snapshot = new ArrayList<>(service.getTermuxSessions());
+        for (TermuxSession termuxSession : snapshot) {
+            TerminalSession terminalSession = termuxSession.getTerminalSession();
+            if (terminalSession == null || terminalSession == keep) continue;
+
+            termuxSession.killIfExecuting(mActivity, true);
+            if (service.getIndexOfSession(terminalSession) >= 0)
+                service.removeTermuxSession(terminalSession);
+        }
+
+        termuxSessionListNotifyUpdated();
+        if (keep != null) setCurrentSession(keep);
+        else mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
+    }
+
     @SuppressLint("InflateParams")
     public void renameSession(final TerminalSession sessionToRename) {
         if (sessionToRename == null) return;
@@ -399,7 +447,8 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
         TextInputDialogUtils.textInput(mActivity, R.string.title_rename_session, sessionToRename.mSessionName, R.string.action_rename_session_confirm, text -> {
             renameSession(sessionToRename, text);
             termuxSessionListNotifyUpdated();
-        }, -1, null, -1, null, null);
+        }, -1, null, -1, null,
+            dialog -> mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme()));
     }
 
     private void renameSession(TerminalSession sessionToRename, String text) {

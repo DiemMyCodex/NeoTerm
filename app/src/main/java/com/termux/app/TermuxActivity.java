@@ -1,5 +1,6 @@
 package com.termux.app;
 
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -16,6 +17,7 @@ import android.os.Looper;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -187,6 +189,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private float mTerminalToolbarDefaultHeight;
 
+    /** Raised height of the extra keys pager before the quick collapse toggle shrinks it. */
+    private int mTerminalToolbarExpandedHeightPx;
+
+    private View mTerminalExtraKeysDock;
+    private ImageButton mExtraKeysCollapseButton;
+    private ValueAnimator mExtraKeysHeightAnimator;
+    private boolean mExtraKeysCollapsed;
+
+    private static final int EXTRA_KEYS_COLLAPSE_MS = 200;
 
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
     private static final int CONTEXT_MENU_SHARE_TRANSCRIPT_ID = 1;
@@ -372,6 +383,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onDestroy");
 
         if (mIsInvalidState) return;
+
+        if (mSessionTabAdapter != null) mSessionTabAdapter.release();
+        if (mExtraKeysHeightAnimator != null) {
+            mExtraKeysHeightAnimator.cancel();
+            mExtraKeysHeightAnimator = null;
+        }
 
         if (mTermuxService != null) {
             // Do not leave service and session clients with references to activity.
@@ -605,8 +622,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mTermuxTerminalExtraKeys = new TermuxTerminalExtraKeys(this, mTerminalView,
             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
 
+        mTerminalExtraKeysDock = findViewById(R.id.terminal_extra_keys_dock);
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (mPreferences.shouldShowTerminalToolbar()) terminalToolbarViewPager.setVisibility(View.VISIBLE);
+        if (mTerminalExtraKeysDock != null && mPreferences.shouldShowTerminalToolbar())
+            mTerminalExtraKeysDock.setVisibility(View.VISIBLE);
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
         mTerminalToolbarDefaultHeight = layoutParams.height;
@@ -619,27 +638,78 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         terminalToolbarViewPager.setAdapter(new TerminalToolbarViewPager.PageAdapter(this, savedTextInput));
         terminalToolbarViewPager.addOnPageChangeListener(new TerminalToolbarViewPager.OnPageChangeListener(this, terminalToolbarViewPager));
+
+        setExtraKeysCollapseToggle();
     }
 
     private void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
         if (terminalToolbarViewPager == null) return;
 
-        ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
-        layoutParams.height = Math.round(mTerminalToolbarDefaultHeight *
+        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight *
             (mTermuxTerminalExtraKeys.getExtraKeysInfo() == null ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length) *
             mProperties.getTerminalToolbarHeightScaleFactor());
+        mTerminalToolbarExpandedHeightPx = expandedHeight;
+
+        ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
+        layoutParams.height = mExtraKeysCollapsed ? 0 : expandedHeight;
         terminalToolbarViewPager.setLayoutParams(layoutParams);
     }
 
-    public void toggleTerminalToolbar() {
+    /** Compact chevron: collapses the keycaps to 0px so long output gets the full viewport. */
+    private void setExtraKeysCollapseToggle() {
+        mExtraKeysCollapseButton = findViewById(R.id.extra_keys_collapse_button);
+        if (mExtraKeysCollapseButton == null) return;
+
+        mExtraKeysCollapseButton.setOnTouchListener(new TactilePressTouchListener());
+        mExtraKeysCollapseButton.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            setExtraKeysCollapsed(!mExtraKeysCollapsed);
+            restoreTerminalFocusAndIme(shouldRestoreIme());
+        });
+    }
+
+    private void setExtraKeysCollapsed(boolean collapsed) {
+        if (mExtraKeysCollapsed == collapsed) return;
+
+        mExtraKeysCollapsed = collapsed;
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
         if (terminalToolbarViewPager == null) return;
 
+        if (mExtraKeysHeightAnimator != null) mExtraKeysHeightAnimator.cancel();
+
+        int startHeight = terminalToolbarViewPager.getLayoutParams().height;
+        int endHeight = collapsed ? 0 : mTerminalToolbarExpandedHeightPx;
+        mExtraKeysHeightAnimator = ValueAnimator.ofInt(startHeight, endHeight);
+        mExtraKeysHeightAnimator.setDuration(EXTRA_KEYS_COLLAPSE_MS);
+        mExtraKeysHeightAnimator.setInterpolator(new DecelerateInterpolator());
+        mExtraKeysHeightAnimator.addUpdateListener(animation -> {
+            ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
+            layoutParams.height = (Integer) animation.getAnimatedValue();
+            terminalToolbarViewPager.setLayoutParams(layoutParams);
+        });
+        mExtraKeysHeightAnimator.start();
+
+        if (mExtraKeysCollapseButton != null) {
+            mExtraKeysCollapseButton.animate()
+                .rotation(collapsed ? 180f : 0f)
+                .setDuration(EXTRA_KEYS_COLLAPSE_MS)
+                .start();
+            mExtraKeysCollapseButton.setContentDescription(getString(collapsed
+                ? R.string.action_expand_extra_keys : R.string.action_collapse_extra_keys));
+        }
+    }
+
+    public void toggleTerminalToolbar() {
+        final View dock = getTerminalExtraKeysDock();
+        if (dock == null) return;
+
         final boolean showNow = mPreferences.toogleShowTerminalToolbar();
         Logger.showToast(this, (showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar)), true);
-        terminalToolbarViewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
-        if (showNow && isTerminalToolbarTextInputViewSelected()) {
+        dock.setVisibility(showNow ? View.VISIBLE : View.GONE);
+        if (!showNow) {
+            restoreTerminalFocus(false);
+        } else if (isTerminalToolbarTextInputViewSelected()) {
             // Focus the text input view if just revealed.
             findViewById(R.id.terminal_toolbar_text_input).requestFocus();
         }
@@ -934,6 +1004,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     public ViewPager getTerminalToolbarViewPager() {
         return (ViewPager) findViewById(R.id.terminal_toolbar_view_pager);
+    }
+
+    public View getTerminalExtraKeysDock() {
+        return findViewById(R.id.terminal_extra_keys_dock);
     }
 
     public float getTerminalToolbarDefaultHeight() {

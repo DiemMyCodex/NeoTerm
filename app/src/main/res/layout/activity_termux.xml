@@ -20,7 +20,7 @@
             android:id="@+id/drawer_layout"
             android:layout_width="match_parent"
             android:layout_alignParentTop="true"
-            android:layout_above="@+id/terminal_toolbar_view_pager"
+            android:layout_above="@+id/terminal_extra_keys_dock"
             android:layout_height="match_parent">
 
             <!-- IMPORTANT: do NOT put blocksDescendants here. It used to wrap the
@@ -34,15 +34,26 @@
                 android:focusable="false"
                 android:focusableInTouchMode="false">
 
-                <!-- Reserves 10dp top margin + 44dp pill + 10dp breathing room so
-                     terminal output is never drawn behind the floating pill. -->
+                <!-- 96dp slot gives the ambient glow room to breathe while the pill
+                     itself stays at 44dp. Every child here is non-focusable. -->
                 <FrameLayout
                     android:id="@+id/terminal_session_tab_bar_slot"
                     android:layout_width="match_parent"
-                    android:layout_height="64dp"
+                    android:layout_height="96dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:descendantFocusability="blocksDescendants"
                     android:focusable="false"
                     android:focusableInTouchMode="false">
+
+                    <View
+                        android:id="@+id/terminal_top_ambient_glow"
+                        android:layout_width="match_parent"
+                        android:layout_height="96dp"
+                        android:background="@drawable/top_ambient_glow"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false" />
 
                     <LinearLayout
                         android:id="@+id/terminal_session_tab_bar"
@@ -57,8 +68,8 @@
                         android:elevation="6dp"
                         android:paddingStart="4dp"
                         android:paddingEnd="4dp"
-                        android:paddingTop="4dp"
-                        android:paddingBottom="4dp"
+                        android:paddingTop="5dp"
+                        android:paddingBottom="5dp"
                         android:descendantFocusability="blocksDescendants"
                         android:focusable="false"
                         android:focusableInTouchMode="false">
@@ -76,6 +87,8 @@
                             android:paddingTop="0dp"
                             android:paddingBottom="0dp"
                             android:clipToPadding="false"
+                            android:requiresFadingEdge="horizontal"
+                            android:fadingEdgeLength="18dp"
                             android:overScrollMode="never"
                             android:background="@null"
                             android:descendantFocusability="blocksDescendants"
@@ -109,9 +122,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:background="@android:color/black"
                     android:defaultFocusHighlightEnabled="false"
                     android:focusable="true"
                     android:focusableInTouchMode="true"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:clipToPadding="false"
                     android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
                     android:scrollbars="vertical"
                     tools:ignore="UnusedAttribute" />
@@ -179,16 +196,56 @@
 
         </androidx.drawerlayout.widget.DrawerLayout>
 
-        <!-- 42dp row = 36dp keycap + 3dp margins on each side. -->
-        <androidx.viewpager.widget.ViewPager
-            android:id="@+id/terminal_toolbar_view_pager"
-            android:visibility="gone"
+        <!-- Floating glass dock: 36dp keycaps + 3dp padding = 42dp row, plus
+             10dp side margins and 8dp bottom margin. The chevron collapses the
+             pager height to 0 without stealing focus from the terminal. -->
+        <LinearLayout
+            android:id="@+id/terminal_extra_keys_dock"
             android:layout_width="match_parent"
-            android:layout_height="42dp"
-            android:background="@color/black"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="8dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/extra_keys_dock_background"
+            android:elevation="8dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:visibility="gone"
+            android:descendantFocusability="blocksDescendants"
             android:focusable="false"
-            android:focusableInTouchMode="false"
-            android:layout_alignParentBottom="true" />
+            android:focusableInTouchMode="false">
+
+            <androidx.viewpager.widget.ViewPager
+                android:id="@+id/terminal_toolbar_view_pager"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="2dp"
+                android:background="@null"
+                android:descendantFocusability="blocksDescendants"
+                android:focusable="false"
+                android:focusableInTouchMode="false" />
+
+            <ImageButton
+                android:id="@+id/extra_keys_collapse_button"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:src="@drawable/ic_chevron_down"
+                android:background="@drawable/extra_keys_toggle_background"
+                android:scaleType="centerInside"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:contentDescription="@string/action_collapse_extra_keys"
+                android:focusable="false"
+                android:focusableInTouchMode="false" />
+
+        </LinearLayout>
 
     </RelativeLayout>
 
