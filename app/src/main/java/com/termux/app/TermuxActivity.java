@@ -12,6 +12,7 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -30,6 +31,7 @@ import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
+import com.termux.app.terminal.TermuxSessionTabAdapter;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.shared.activities.ReportActivity;
 import com.termux.shared.activity.ActivityUtils;
@@ -63,6 +65,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
 import java.util.Arrays;
@@ -137,6 +140,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * The termux sessions list controller.
      */
     TermuxSessionsListViewController mTermuxSessionListViewController;
+
+    /**
+     * The persistent top tab bar adapter. Backed by the service-owned session list.
+     */
+    TermuxSessionTabAdapter mSessionTabAdapter;
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -242,6 +250,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         setTermuxTerminalViewAndClients();
+
+        setSessionTabBar();
 
         setTerminalToolbarView(savedInstanceState);
 
@@ -391,6 +401,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setTermuxSessionsListView();
 
+        // Bind the tab bar to the exact same service-owned list, no copy.
+        if (mSessionTabAdapter != null) mSessionTabAdapter.setSessions(mTermuxService.getTermuxSessions());
+
         final Intent intent = getIntent();
         setIntent(null);
 
@@ -503,6 +516,35 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         termuxSessionsListView.setAdapter(mTermuxSessionListViewController);
         termuxSessionsListView.setOnItemClickListener(mTermuxSessionListViewController);
         termuxSessionsListView.setOnItemLongClickListener(mTermuxSessionListViewController);
+    }
+
+    /**
+     * Set up the persistent top session tab bar. The adapter is created before the service
+     * connects with an empty list, then rebound to the service-owned list in
+     * {@link #onServiceConnected(ComponentName, IBinder)}.
+     */
+    private void setSessionTabBar() {
+        RecyclerView sessionTabsRecyclerView = findViewById(R.id.terminal_session_tabs);
+        if (sessionTabsRecyclerView == null) return;
+
+        mSessionTabAdapter = new TermuxSessionTabAdapter(this);
+        mSessionTabAdapter.attachTo(sessionTabsRecyclerView);
+
+        View newSessionTabButton = findViewById(R.id.new_session_tab_button);
+        if (newSessionTabButton != null) {
+            newSessionTabButton.setOnClickListener(v -> {
+                mTermuxTerminalSessionActivityClient.addNewSession(false, null);
+                restoreTerminalFocus();
+            });
+        }
+    }
+
+    /**
+     * Restore focus to {@link #mTerminalView} only if it actually lost it. Calling requestFocus()
+     * on an already-focused view fires no focus change, so the soft keyboard stays put.
+     */
+    public void restoreTerminalFocus() {
+        if (mTerminalView != null && !mTerminalView.hasFocus()) mTerminalView.requestFocus();
     }
 
 
@@ -856,7 +898,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
 
     public void termuxSessionListNotifyUpdated() {
-        mTermuxSessionListViewController.notifyDataSetChanged();
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            runOnUiThread(this::termuxSessionListNotifyUpdated);
+            return;
+        }
+
+        if (mTermuxSessionListViewController != null) mTermuxSessionListViewController.notifyDataSetChanged();
+        if (mSessionTabAdapter != null) mSessionTabAdapter.notifyDataSetChanged();
     }
 
     public boolean isVisible() {

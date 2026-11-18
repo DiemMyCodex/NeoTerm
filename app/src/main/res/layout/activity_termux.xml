@@ -23,15 +23,62 @@
             android:layout_above="@+id/terminal_toolbar_view_pager"
             android:layout_height="match_parent">
 
-            <com.termux.view.TerminalView
-                android:id="@+id/terminal_view"
+            <LinearLayout
+                android:id="@+id/terminal_content_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:defaultFocusHighlightEnabled="false"
-                android:focusableInTouchMode="true"
-                android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
-                android:scrollbars="vertical"
-                tools:ignore="UnusedAttribute" />
+                android:orientation="vertical"
+                android:descendantFocusability="blocksDescendants"
+                android:focusable="false"
+                android:focusableInTouchMode="false">
+
+                <!-- Persistent top session tab bar. Every child is non-focusable so the
+                     soft keyboard never hides/flickers when tabs are tapped. -->
+                <LinearLayout
+                    android:id="@+id/terminal_session_tab_bar"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="?attr/termuxActivityDrawerBackground"
+                    android:descendantFocusability="blocksDescendants"
+                    android:focusable="false"
+                    android:focusableInTouchMode="false">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/terminal_session_tabs"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:descendantFocusability="blocksDescendants"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        tools:listitem="@layout/item_session_tab" />
+
+                    <ImageButton
+                        android:id="@+id/new_session_tab_button"
+                        android:layout_width="40dp"
+                        android:layout_height="match_parent"
+                        android:src="@drawable/ic_new_session"
+                        android:background="?attr/selectableItemBackground"
+                        app:tint="?attr/termuxActivityDrawerImageTint"
+                        android:contentDescription="@string/action_new_session"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false" />
+
+                </LinearLayout>
+
+                <com.termux.view.TerminalView
+                    android:id="@+id/terminal_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:focusableInTouchMode="true"
+                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+                    android:scrollbars="vertical"
+                    tools:ignore="UnusedAttribute" />
+
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/left_drawer"

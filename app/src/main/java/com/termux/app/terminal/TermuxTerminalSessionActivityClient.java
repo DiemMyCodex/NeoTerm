@@ -340,6 +340,49 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             setCurrentSession(termuxSession.getTerminalSession());
     }
 
+    /**
+     * Close a session from the top tab bar. This deliberately reuses the existing service
+     * lifecycle instead of keeping a parallel session list:
+     *
+     * <ul>
+     *   <li>inactive tab - only that session is killed, the current one is untouched;</li>
+     *   <li>active tab - an adjacent session is attached first (previous, else next);</li>
+     *   <li>last tab - a fresh default session is created so the view is never empty.</li>
+     * </ul>
+     *
+     * <p>{@link TermuxSession#killIfExecuting(Context, boolean)} with {@code processResult=true}
+     * routes through {@link TermuxService#onTermuxSessionExited(TermuxSession)}, which removes
+     * the session from the single service-owned list and refreshes both session UIs.</p>
+     */
+    public void closeSession(@Nullable TerminalSession session) {
+        if (session == null) return;
+        TermuxService service = mActivity.getTermuxService();
+        if (service == null) return;
+
+        int index = service.getIndexOfSession(session);
+        if (index < 0) return;
+        int size = service.getTermuxSessionsSize();
+
+        if (session == mActivity.getCurrentSession() && size > 1) {
+            int neighbourIndex = index > 0 ? index - 1 : 1;
+            TermuxSession neighbour = service.getTermuxSession(neighbourIndex);
+            if (neighbour != null) setCurrentSession(neighbour.getTerminalSession());
+        }
+
+        TermuxSession termuxSession = service.getTermuxSession(index);
+        if (termuxSession == null) return;
+
+        termuxSession.killIfExecuting(mActivity, true);
+
+        // Already-finished sessions make killIfExecuting() a no-op; the service cleanup path
+        // still needs to run for them so they are dropped from the list.
+        if (service.getIndexOfSession(session) >= 0) service.removeTermuxSession(session);
+
+        termuxSessionListNotifyUpdated();
+
+        if (service.getTermuxSessionsSize() == 0) addNewSession(false, null);
+    }
+
     @SuppressLint("InflateParams")
     public void renameSession(final TerminalSession sessionToRename) {
         if (sessionToRename == null) return;
