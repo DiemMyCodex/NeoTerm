@@ -37,3 +37,7 @@ local.properties
 .swp
 ehthumbs.db
 Thumbs.db
+
+# Downloaded CI artifacts (local only)
+/ci-artifacts/
+/ci-artifacts-sums/
