@@ -708,7 +708,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.showToast(this, (showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar)), true);
         dock.setVisibility(showNow ? View.VISIBLE : View.GONE);
         if (!showNow) {
-            restoreTerminalFocus(false);
+            restoreTerminalFocus();
         } else if (isTerminalToolbarTextInputViewSelected()) {
             // Focus the text input view if just revealed.
             findViewById(R.id.terminal_toolbar_text_input).requestFocus();
