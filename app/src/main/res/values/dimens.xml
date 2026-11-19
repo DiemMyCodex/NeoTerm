@@ -35,6 +35,11 @@
     <dimen name="neoterm_dock_elevation">8dp</dimen>
     <dimen name="neoterm_chevron_size">34dp</dimen>
 
+    <!-- Collapsible top-right mini pill. -->
+    <dimen name="neoterm_mini_pill_height">36dp</dimen>
+    <dimen name="neoterm_mini_pill_margin">8dp</dimen>
+    <dimen name="neoterm_mini_status_dot_size">8dp</dimen>
+
     <!-- Live theme switcher. -->
     <dimen name="neoterm_theme_menu_width">220dp</dimen>
     <dimen name="neoterm_theme_swatch_size">18dp</dimen>

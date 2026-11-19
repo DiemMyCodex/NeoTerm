@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 8dp live status dot for the collapsed mini pill. ThemeApplier retints the shared
+     GradientDrawable instance in place; no allocation on a status change. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <size
+        android:width="@dimen/neoterm_mini_status_dot_size"
+        android:height="@dimen/neoterm_mini_status_dot_size" />
+    <solid android:color="@color/session_status_idle" />
+</shape>

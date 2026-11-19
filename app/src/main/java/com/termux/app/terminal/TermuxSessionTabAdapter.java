@@ -60,6 +60,14 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
     private final Map<String, Boolean> mForegroundStates = new HashMap<>();
     private final SessionProcessMonitor mProcessMonitor;
 
+    /** Notified on the main looper only when the ACTIVE session flips idle/busy. */
+    public interface ActiveStatusListener {
+        void onActiveStatusChanged(boolean busy);
+    }
+
+    private ActiveStatusListener mActiveStatusListener;
+    private Boolean mLastActiveBusy;
+
     private int mActiveTextColor;
     private int mInactiveTextColor;
     private int mActiveCloseColor;
@@ -146,11 +154,23 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         mMainHandler.removeCallbacksAndMessages(null);
     }
 
+    /** Wire the collapsed mini pill dot. A null listener disables notifications. */
+    public void setActiveStatusListener(@Nullable ActiveStatusListener listener) {
+        mActiveStatusListener = listener;
+        mLastActiveBusy = null;
+    }
+
+    /** Latest known state of the active session, used when a theme is (re)applied. */
+    public boolean isActiveBusy() {
+        return isBusy(mActivity.getCurrentSession());
+    }
+
     /** Bind to the service-owned session list. Call once after the service connects. */
     public void setSessions(@Nullable List<TermuxSession> sessions) {
         mSessions = sessions == null ? Collections.emptyList() : sessions;
         mForegroundStates.clear();
         mLastActivePosition = -1;
+        mLastActiveBusy = null;
         notifyDataSetChanged();
     }
 
@@ -292,11 +312,24 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         for (Map.Entry<String, Boolean> entry : changed.entrySet())
             mForegroundStates.put(entry.getKey(), entry.getValue());
 
+        boolean tabChanged = false;
         for (TermuxSession termuxSession : mSessions) {
             TerminalSession session = termuxSession == null ? null : termuxSession.getTerminalSession();
             if (session != null && changed.containsKey(session.mHandle)) {
-                notifyDataSetChanged();
-                return;
+                tabChanged = true;
+                break;
+            }
+        }
+        if (tabChanged) notifyDataSetChanged();
+
+        // The mini pill mirrors only the active session. The diff is already main-thread and
+        // change-only, so this adds no polling and no redraw when a background tab flips.
+        TerminalSession active = mActivity.getCurrentSession();
+        if (active != null && changed.containsKey(active.mHandle)) {
+            boolean busy = isBusy(active);
+            if (mLastActiveBusy == null || !mLastActiveBusy.equals(busy)) {
+                mLastActiveBusy = busy;
+                if (mActiveStatusListener != null) mActiveStatusListener.onActiveStatusChanged(busy);
             }
         }
     }

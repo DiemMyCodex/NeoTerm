@@ -138,6 +138,11 @@ public final class ThemeApplier {
         View bar = mActivity.findViewById(R.id.terminal_session_tab_bar);
         tintShape(bar, c.pillSurface, c.stroke, hairline);
 
+        // The collapsed mini pill reuses the same #C7 glass surface and 1dp translucent
+        // stroke tokens, so a theme switch repaints expanded and collapsed chrome together.
+        View miniPill = mActivity.findViewById(R.id.mini_pill);
+        tintShape(miniPill, c.pillSurface, c.stroke, hairline);
+
         View dock = mActivity.findViewById(R.id.terminal_extra_keys_dock);
         tintShape(dock, c.dockSurface, c.stroke, hairline);
 
@@ -149,6 +154,38 @@ public final class ThemeApplier {
         // The + button uses the same translucent glass fill. Keep its glyph white for contrast.
         ImageButton addButton = mActivity.findViewById(R.id.new_session_tab_button);
         tintShape(addButton, c.softFill, c.stroke, hairline);
+
+        // Both pill chevrons are circular glass buttons tinted by the theme accent.
+        ImageButton collapseButton = mActivity.findViewById(R.id.pill_collapse_button);
+        tintShape(collapseButton, c.softFill, c.stroke, hairline);
+        if (collapseButton != null)
+            ImageViewCompat.setImageTintList(collapseButton, ColorStateList.valueOf(c.activeTabFill));
+
+        ImageButton expandButton = mActivity.findViewById(R.id.pill_expand_button);
+        tintShape(expandButton, c.softFill, c.stroke, hairline);
+        if (expandButton != null)
+            ImageViewCompat.setImageTintList(expandButton, ColorStateList.valueOf(c.activeTabFill));
+
+        // Seed the dot with the monitor's latest state so a theme switch cannot flash idle.
+        TermuxSessionTabAdapter adapter = mActivity.getSessionTabAdapter();
+        updateMiniPillStatus(adapter != null && adapter.isActiveBusy());
+    }
+
+    /**
+     * Recolor the collapsed mini pill status dot from an already main-thread status diff.
+     * No polling here: the adapter's background monitor is the only source of updates.
+     */
+    public void updateMiniPillStatus(boolean busy) {
+        TerminalThemeSpec.Chrome c = current().chrome;
+        View dot = mActivity.findViewById(R.id.mini_pill_status_dot);
+        if (dot == null) return;
+
+        int color = busy ? c.statusBusy : c.statusIdle;
+        Drawable background = dot.getBackground();
+        if (background instanceof GradientDrawable)
+            ((GradientDrawable) background.mutate()).setColor(color);
+        else
+            dot.setBackgroundTintList(ColorStateList.valueOf(color));
     }
 
     private void applyAdapter(TerminalThemeSpec theme) {

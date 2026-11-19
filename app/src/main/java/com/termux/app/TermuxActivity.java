@@ -38,6 +38,7 @@ import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.TactilePressTouchListener;
 import com.termux.app.terminal.TermuxSessionTabAdapter;
+import com.termux.app.terminal.TopPillDockState;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.shared.activities.ReportActivity;
 import com.termux.shared.activity.ActivityUtils;
@@ -159,6 +160,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private ThemeApplier mThemeApplier;
     private ThemeSwitcherPopup mThemeSwitcherPopup;
 
+    /** Collapsible top-right mini pill: instantaneous width snap, never animated. */
+    private View mTopPillWrapper;
+    private View mTopPillBar;
+    private View mMiniPill;
+    private boolean mTopPillCollapsed;
+
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
      */
@@ -221,6 +228,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private static final String ARG_TERMINAL_TOOLBAR_TEXT_INPUT = "terminal_toolbar_text_input";
     private static final String ARG_ACTIVITY_RECREATED = "activity_recreated";
+    private static final String ARG_TOP_PILL_COLLAPSED = "top_pill_collapsed";
 
     private static final String LOG_TAG = "TermuxActivity";
 
@@ -232,8 +240,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onCreate");
         mIsOnResumeAfterOnCreate = true;
 
-        if (savedInstanceState != null)
+        if (savedInstanceState != null) {
             mIsActivityRecreated = savedInstanceState.getBoolean(ARG_ACTIVITY_RECREATED, false);
+            mTopPillCollapsed = savedInstanceState.getBoolean(ARG_TOP_PILL_COLLAPSED, false);
+        }
 
         // Delete ReportInfo serialized object files from cache older than 14 days
         ReportActivity.deleteReportInfoFilesOlderThanXDays(this, 14, false);
@@ -424,6 +434,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         super.onSaveInstanceState(savedInstanceState);
         saveTerminalToolbarTextInput(savedInstanceState);
         savedInstanceState.putBoolean(ARG_ACTIVITY_RECREATED, true);
+        savedInstanceState.putBoolean(ARG_TOP_PILL_COLLAPSED, mTopPillCollapsed);
     }
 
 
@@ -582,6 +593,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mThemeApplier = new ThemeApplier(this);
         mThemeSwitcherPopup = new ThemeSwitcherPopup(this, mThemeApplier);
 
+        // The monitor already posts change-only diffs to the main looper; mirror them into
+        // the collapsed dot without introducing a second polling loop.
+        mSessionTabAdapter.setActiveStatusListener(busy -> {
+            if (mThemeApplier != null) mThemeApplier.updateMiniPillStatus(busy);
+        });
+
         View themeSwitcherButton = findViewById(R.id.theme_switcher_button);
         if (themeSwitcherButton != null) {
             themeSwitcherButton.setOnTouchListener(new TactilePressTouchListener());
@@ -599,6 +616,75 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 restoreTerminalFocusAndIme(shouldRestoreIme());
             });
         }
+
+        setTopPillToggle();
+    }
+
+    /** Wire the haptic-only collapse/expand chevrons. Chrome never keeps focus or the IME. */
+    private void setTopPillToggle() {
+        View collapseButton = findViewById(R.id.pill_collapse_button);
+        if (collapseButton != null) {
+            collapseButton.setOnTouchListener(new TactilePressTouchListener());
+            collapseButton.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                setTopPillCollapsed(true);
+            });
+        }
+
+        View expandButton = findViewById(R.id.pill_expand_button);
+        if (expandButton != null) {
+            expandButton.setOnTouchListener(new TactilePressTouchListener());
+            expandButton.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                setTopPillCollapsed(false);
+            });
+        }
+
+        mTopPillWrapper = findViewById(R.id.terminal_session_tab_bar_slot);
+        mTopPillBar = findViewById(R.id.terminal_session_tab_bar);
+        mMiniPill = findViewById(R.id.mini_pill);
+
+        // On recreate the views are fresh, so replay the persisted state after inflation.
+        if (mTopPillCollapsed) applyTopPillState(TopPillDockState.forCollapsed(true));
+    }
+
+    private void setTopPillCollapsed(boolean collapsed) {
+        if (mTopPillCollapsed == collapsed) return;
+        mTopPillCollapsed = collapsed;
+        applyTopPillState(TopPillDockState.forCollapsed(collapsed));
+        restoreTerminalFocusAndIme(shouldRestoreIme());
+    }
+
+    /**
+     * Apply the pure state model verbatim: one layout-param write and visibility snaps, with
+     * no width animation. Collapsed WRAP_CONTENT + ALIGN_PARENT_END leaves TerminalView row 0
+     * outside the mini pill completely unobstructed.
+     */
+    private void applyTopPillState(TopPillDockState state) {
+        if (mTopPillWrapper != null) {
+            ViewGroup.LayoutParams params = mTopPillWrapper.getLayoutParams();
+            if (params instanceof RelativeLayout.LayoutParams) {
+                RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) params;
+                lp.width = state.wrapperWidth;
+                // addRule(..., 0) clears the rule when returning to the expanded state.
+                lp.addRule(RelativeLayout.ALIGN_PARENT_END,
+                    state.wrapperWidth == TopPillDockState.WRAP_CONTENT ? RelativeLayout.TRUE : 0);
+                mTopPillWrapper.setLayoutParams(lp);
+            }
+        }
+
+        setViewVisibility(mTopPillBar, state.barVisibility);
+        setViewVisibility(findViewById(R.id.terminal_session_tabs), state.tabsVisibility);
+        setViewVisibility(findViewById(R.id.theme_switcher_button), state.paletteVisibility);
+        setViewVisibility(findViewById(R.id.new_session_tab_button), state.addVisibility);
+        setViewVisibility(findViewById(R.id.pill_collapse_button), state.collapseVisibility);
+        setViewVisibility(mMiniPill, state.miniPillVisibility);
+        setViewVisibility(findViewById(R.id.mini_pill_status_dot), state.statusDotVisibility);
+        setViewVisibility(findViewById(R.id.pill_expand_button), state.expandVisibility);
+    }
+
+    private static void setViewVisibility(View view, int visibility) {
+        if (view != null) view.setVisibility(visibility);
     }
 
     /** The floating pill adapter, exposed so the theme engine can recolor it in place. */

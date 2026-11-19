@@ -50,6 +50,8 @@
     <string name="action_close_other_tabs">Close Other Tabs</string>
     <string name="action_collapse_extra_keys">Collapse extra keys</string>
     <string name="action_expand_extra_keys">Expand extra keys</string>
+    <string name="action_collapse_pill">Collapse session pill</string>
+    <string name="action_expand_pill">Expand session pill</string>
     <string name="action_switch_theme">Switch theme</string>
     <string name="title_max_terminals_reached">Max terminals reached</string>
     <string name="msg_max_terminals_reached">Close down existing ones before creating new.</string>

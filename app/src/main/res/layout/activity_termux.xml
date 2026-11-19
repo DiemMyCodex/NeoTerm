@@ -38,7 +38,9 @@
                 android:focusableInTouchMode="false">
 
                 <!-- Transparent, non-interactive wrapper: touches in the side margins fall
-                     through to TerminalView underneath; only the glass pill itself is live. -->
+                     through to TerminalView underneath; only the glass pill itself is live.
+                     When collapsed it snaps to WRAP_CONTENT + alignParentEnd so the entire
+                     top-left/top-center of TerminalView row 0 is exposed directly. -->
                 <FrameLayout
                     android:id="@+id/terminal_session_tab_bar_slot"
                     android:layout_width="match_parent"
@@ -49,6 +51,7 @@
                     android:clickable="false"
                     android:focusable="false"
                     android:focusableInTouchMode="false"
+                    android:descendantFocusability="blocksDescendants"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
@@ -127,7 +130,7 @@
                             android:layout_width="@dimen/neoterm_chevron_size"
                             android:layout_height="@dimen/neoterm_chevron_size"
                             android:layout_marginStart="0dp"
-                            android:layout_marginEnd="2dp"
+                            android:layout_marginEnd="@dimen/neoterm_tab_gap"
                             android:src="@drawable/ic_add_session"
                             android:background="@drawable/add_session_button_background"
                             android:scaleType="centerInside"
@@ -139,6 +142,73 @@
                             android:focusable="false"
                             android:focusableInTouchMode="false" />
 
+                        <!-- 34dp circular glass chevron. Haptic-only chrome: never focuses. -->
+                        <ImageButton
+                            android:id="@+id/pill_collapse_button"
+                            android:layout_width="@dimen/neoterm_chevron_size"
+                            android:layout_height="@dimen/neoterm_chevron_size"
+                            android:layout_marginStart="0dp"
+                            android:layout_marginEnd="0dp"
+                            android:src="@drawable/ic_pill_collapse"
+                            android:background="@drawable/theme_button_background"
+                            android:scaleType="centerInside"
+                            android:padding="0dp"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            app:tint="@color/session_tab_add_icon"
+                            android:contentDescription="@string/action_collapse_pill"
+                            android:descendantFocusability="blocksDescendants"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
+
+                    </LinearLayout>
+
+                    <!-- COLLAPSED: 36dp glass mini pill docked top-end. Only the live busy/idle
+                         dot and the expand chevron remain; every expanded control is GONE. -->
+                    <LinearLayout
+                        android:id="@+id/mini_pill"
+                        android:layout_width="wrap_content"
+                        android:layout_height="@dimen/neoterm_mini_pill_height"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="@dimen/neoterm_mini_pill_margin"
+                        android:layout_marginEnd="@dimen/neoterm_mini_pill_margin"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="3dp"
+                        android:background="@drawable/session_tab_bar_background"
+                        android:elevation="@dimen/neoterm_pill_elevation"
+                        android:visibility="gone"
+                        android:descendantFocusability="blocksDescendants"
+                        android:clickable="false"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false">
+
+                        <View
+                            android:id="@+id/mini_pill_status_dot"
+                            android:layout_width="@dimen/neoterm_mini_status_dot_size"
+                            android:layout_height="@dimen/neoterm_mini_status_dot_size"
+                            android:layout_marginEnd="4dp"
+                            android:background="@drawable/mini_pill_status_dot"
+                            android:clickable="false"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
+
+                        <ImageButton
+                            android:id="@+id/pill_expand_button"
+                            android:layout_width="@dimen/neoterm_chevron_size"
+                            android:layout_height="@dimen/neoterm_chevron_size"
+                            android:src="@drawable/ic_pill_expand"
+                            android:background="@drawable/theme_button_background"
+                            android:scaleType="centerInside"
+                            android:padding="0dp"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            app:tint="@color/session_tab_add_icon"
+                            android:contentDescription="@string/action_expand_pill"
+                            android:descendantFocusability="blocksDescendants"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
                     </LinearLayout>
 
                 </FrameLayout>
