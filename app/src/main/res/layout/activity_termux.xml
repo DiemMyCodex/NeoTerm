@@ -196,26 +196,27 @@
 
         </androidx.drawerlayout.widget.DrawerLayout>
 
-        <!-- Floating glass dock: the pager takes all remaining width (weight=1)
-             to the left of the chevron. Two 40dp rows give an 80dp glass dock,
-             with 10dp side margins and an 8dp bottom margin. The chevron
-             collapses the pager height to 0 without stealing terminal focus. -->
+        <!-- Floating glass dock. The pager is the FIRST child and owns all remaining
+             width (0dp + weight=1); the chevron is the SECOND child. Symmetric 6dp
+             padding and baselineAligned=false stop LinearLayout from collapsing the
+             weighted page. Collapsing shrinks the whole dock to a compact pill. -->
         <LinearLayout
             android:id="@+id/terminal_extra_keys_dock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
+            android:layout_marginStart="@dimen/extra_keys_dock_side_margin"
+            android:layout_marginEnd="@dimen/extra_keys_dock_side_margin"
             android:layout_marginBottom="8dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
+            android:baselineAligned="false"
             android:background="@drawable/extra_keys_dock_background"
             android:elevation="8dp"
             android:paddingStart="6dp"
-            android:paddingEnd="4dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:visibility="gone"
             android:descendantFocusability="blocksDescendants"
             android:focusable="false"
@@ -226,7 +227,6 @@
                 android:layout_width="0dp"
                 android:layout_height="@dimen/extra_keys_dock_height"
                 android:layout_weight="1"
-                android:layout_marginEnd="2dp"
                 android:background="@null"
                 android:descendantFocusability="blocksDescendants"
                 android:focusable="false"
@@ -236,6 +236,7 @@
                 android:id="@+id/extra_keys_collapse_button"
                 android:layout_width="34dp"
                 android:layout_height="34dp"
+                android:layout_marginStart="6dp"
                 android:src="@drawable/ic_chevron_down"
                 android:background="@drawable/extra_keys_toggle_background"
                 android:scaleType="centerInside"

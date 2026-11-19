@@ -297,7 +297,10 @@ public final class ExtraKeysView extends GridLayout {
         // A too-narrow key must ellipsize, never wrap into a clipped first letter.
         button.setMaxLines(1);
         button.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        button.setPadding(0, 0, 0, 0);
+        // A sliver of horizontal inset keeps glyphs off the keycap stroke while
+        // still letting all seven weighted columns share the full dock width.
+        int keyPaddingX = dpToPx(2);
+        button.setPadding(keyPaddingX, 0, keyPaddingX, 0);
         button.setMinHeight(0);
         button.setMinimumHeight(0);
         button.setMinWidth(0);
@@ -537,19 +540,17 @@ public final class ExtraKeysView extends GridLayout {
                     }
                 });
 
-                // Keep keycaps at 0dp and let GridLayout split every column/row
-                // equally (weight=1f). Fixed widths here are what clip labels.
-                LayoutParams param = new GridLayout.LayoutParams();
+                // Give every column and row an equal weight and let GridLayout do
+                // the math. width/height MUST be 0 for weights to apply; a positive
+                // or WRAP_CONTENT value pins keys to their intrinsic width and
+                // collapses the seven-column row into a single clipped letter.
+                LayoutParams param = new GridLayout.LayoutParams(
+                    GridLayout.spec(row, GridLayout.FILL, 1f),
+                    GridLayout.spec(col, GridLayout.FILL, 1f));
                 param.width = 0;
-                if(Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP) {
-                   param.height = (int)(heightPx + 0.5);
-                } else {
-                    param.height = 0;
-                }
+                param.height = 0;
                 int keyMargin = dpToPx(3);
                 param.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
-                param.columnSpec = GridLayout.spec(col, GridLayout.FILL, 1.f);
-                param.rowSpec = GridLayout.spec(row, GridLayout.FILL, 1.f);
                 button.setLayoutParams(param);
 
                 addView(button);

@@ -192,6 +192,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     /** Raised height of the extra keys pager before the quick collapse toggle shrinks it. */
     private int mTerminalToolbarExpandedHeightPx;
 
+    /** Full dock width in pixels, captured before the first collapse so it can be restored. */
+    private int mExtraKeysDockExpandedWidthPx = -1;
+
     private View mTerminalExtraKeysDock;
     private ImageButton mExtraKeysCollapseButton;
     private ValueAnimator mExtraKeysHeightAnimator;
@@ -649,14 +652,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         int rows = mTermuxTerminalExtraKeys.getExtraKeysInfo() == null
             ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length;
-        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight * rows *
-            mProperties.getTerminalToolbarHeightScaleFactor());
-        if (rows >= 2) {
-            // Keep two weighted rows tall enough for 12sp monospace labels even if a
-            // stale toolbar height scale preference tries to shrink them.
-            expandedHeight = Math.max(expandedHeight,
-                Math.round(getResources().getDimension(R.dimen.extra_keys_dock_min_height)));
-        }
+        // A zero/negative row count or scale must never reach the multiplication:
+        // it produces a 0/-1/-2 page height and every weighted GridLayout column
+        // then measures at zero, leaving a single clipped key next to the chevron.
+        rows = Math.max(1, rows);
+        float scale = mProperties.getTerminalToolbarHeightScaleFactor();
+        if (scale <= 0) scale = 1f;
+        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight * rows * scale);
+        int minHeight = Math.round(getResources().getDimension(rows >= 2
+            ? R.dimen.extra_keys_dock_min_height : R.dimen.extra_keys_row_height));
+        expandedHeight = Math.max(expandedHeight, minHeight);
         mTerminalToolbarExpandedHeightPx = expandedHeight;
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
@@ -682,19 +687,43 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mExtraKeysCollapsed = collapsed;
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (terminalToolbarViewPager == null) return;
+        final View dock = getTerminalExtraKeysDock();
+        if (terminalToolbarViewPager == null || dock == null) return;
 
         if (mExtraKeysHeightAnimator != null) mExtraKeysHeightAnimator.cancel();
 
-        int startHeight = terminalToolbarViewPager.getLayoutParams().height;
-        int endHeight = collapsed ? 0 : mTerminalToolbarExpandedHeightPx;
-        mExtraKeysHeightAnimator = ValueAnimator.ofInt(startHeight, endHeight);
+        // Capture the real expanded width once, before any collapse shrinks the dock.
+        if (mExtraKeysDockExpandedWidthPx <= 0) {
+            int measured = dock.getWidth();
+            if (measured <= 0) {
+                measured = getResources().getDisplayMetrics().widthPixels -
+                    2 * Math.round(getResources().getDimension(R.dimen.extra_keys_dock_side_margin));
+            }
+            mExtraKeysDockExpandedWidthPx = measured;
+        }
+
+        final ViewGroup.LayoutParams dockParams = dock.getLayoutParams();
+        final int startWidth = (dockParams.width == ViewGroup.LayoutParams.MATCH_PARENT ||
+            dockParams.width == ViewGroup.LayoutParams.WRAP_CONTENT)
+            ? mExtraKeysDockExpandedWidthPx : dockParams.width;
+        final int endWidth = collapsed
+            ? Math.round(getResources().getDimension(R.dimen.extra_keys_collapsed_dock_width))
+            : mExtraKeysDockExpandedWidthPx;
+        final int startHeight = terminalToolbarViewPager.getLayoutParams().height;
+        final int endHeight = collapsed ? 0 : mTerminalToolbarExpandedHeightPx;
+
+        // Shrink the whole glass pill (not just the page). Animating only the page
+        // left a full-width dark dock with nothing in it.
+        mExtraKeysHeightAnimator = ValueAnimator.ofFloat(0f, 1f);
         mExtraKeysHeightAnimator.setDuration(EXTRA_KEYS_COLLAPSE_MS);
         mExtraKeysHeightAnimator.setInterpolator(new DecelerateInterpolator());
         mExtraKeysHeightAnimator.addUpdateListener(animation -> {
-            ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
-            layoutParams.height = (Integer) animation.getAnimatedValue();
-            terminalToolbarViewPager.setLayoutParams(layoutParams);
+            float fraction = (Float) animation.getAnimatedValue();
+            dockParams.width = Math.round(startWidth + (endWidth - startWidth) * fraction);
+            dock.setLayoutParams(dockParams);
+            ViewGroup.LayoutParams pageParams = terminalToolbarViewPager.getLayoutParams();
+            pageParams.height = Math.round(startHeight + (endHeight - startHeight) * fraction);
+            terminalToolbarViewPager.setLayoutParams(pageParams);
         });
         mExtraKeysHeightAnimator.start();
 

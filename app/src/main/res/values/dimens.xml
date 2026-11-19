@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Horizontal inset of the floating extra keys dock. -->
+    <dimen name="extra_keys_dock_side_margin">10dp</dimen>
     <!-- One extra-keys row. Default layout has two rows, so the dock is 80dp tall. -->
     <dimen name="extra_keys_row_height">40dp</dimen>
     <dimen name="extra_keys_dock_height">80dp</dimen>
     <!-- Never let two weighted rows shrink enough to clip key labels. -->
     <dimen name="extra_keys_dock_min_height">76dp</dimen>
+    <!-- Collapsed dock: 34dp chevron + 6dp marginStart + 6dp padding on each side. -->
+    <dimen name="extra_keys_collapsed_dock_width">52dp</dimen>
 </resources>
