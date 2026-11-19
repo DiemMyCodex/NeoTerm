@@ -26,31 +26,40 @@
             <!-- IMPORTANT: do NOT put blocksDescendants here. It used to wrap the
                  TerminalView and prevent it from ever taking focus, which killed
                  the soft keyboard. Chrome is marked non-focusable individually. -->
-            <LinearLayout
+            <!-- TerminalView fills every pixel from top=0 down to the dock. The session pill
+                 is a later sibling, so it paints ABOVE the terminal text as a true Z-order
+                 overlay instead of reserving a 96dp row and pushing the canvas down. -->
+            <RelativeLayout
                 android:id="@+id/terminal_content_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:orientation="vertical"
+                android:background="@android:color/black"
                 android:focusable="false"
                 android:focusableInTouchMode="false">
 
-                <!-- 96dp slot gives the ambient glow room to breathe while the pill
-                     itself stays at 44dp. Every child here is non-focusable. -->
+                <!-- Transparent, non-interactive wrapper: touches in the side margins fall
+                     through to TerminalView underneath; only the glass pill itself is live. -->
                 <FrameLayout
                     android:id="@+id/terminal_session_tab_bar_slot"
                     android:layout_width="match_parent"
-                    android:layout_height="@dimen/neoterm_pill_slot_height"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:descendantFocusability="blocksDescendants"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentTop="true"
+                    android:elevation="@dimen/neoterm_pill_elevation"
+                    android:background="@null"
+                    android:clickable="false"
                     android:focusable="false"
-                    android:focusableInTouchMode="false">
+                    android:focusableInTouchMode="false"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
 
+                    <!-- Kept only as an ID for legacy layouts. Never drawn: no colored banner,
+                         no dark divider, no gradient above the terminal canvas. -->
                     <View
                         android:id="@+id/terminal_top_ambient_glow"
                         android:layout_width="match_parent"
                         android:layout_height="@dimen/neoterm_pill_slot_height"
                         android:background="@drawable/top_ambient_glow"
+                        android:visibility="gone"
                         android:clickable="false"
                         android:focusable="false"
                         android:focusableInTouchMode="false" />
@@ -137,8 +146,9 @@
                 <com.termux.view.TerminalView
                     android:id="@+id/terminal_view"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
+                    android:layout_height="match_parent"
+                    android:layout_alignParentTop="true"
+                    android:layout_alignParentBottom="true"
                     android:background="@android:color/black"
                     android:defaultFocusHighlightEnabled="false"
                     android:focusable="true"
@@ -150,7 +160,7 @@
                     android:scrollbars="vertical"
                     tools:ignore="UnusedAttribute" />
 
-            </LinearLayout>
+            </RelativeLayout>
 
             <LinearLayout
                 android:id="@+id/left_drawer"

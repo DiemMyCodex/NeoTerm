@@ -44,7 +44,7 @@ public final class TerminalThemeSpec {
         return mAnsi[index];
     }
 
-    /** All chrome colors needed to restyle the glass pill, tabs, glow, dock and keycaps. */
+    /** All chrome colors needed to restyle the floating glass pill, tabs, dock and keycaps. */
     public static final class Chrome {
         public final int pillSurface;
         public final int dockSurface;
@@ -52,7 +52,6 @@ public final class TerminalThemeSpec {
         public final int stroke;
         public final int softFill;
         public final int inactiveTabFill;
-        public final int ambientGlow;
         public final int activeTabFill;
         public final int activeTabText;
         public final int inactiveTabText;
@@ -71,7 +70,6 @@ public final class TerminalThemeSpec {
             stroke = b.stroke;
             softFill = b.softFill;
             inactiveTabFill = b.inactiveTabFill;
-            ambientGlow = b.ambientGlow;
             activeTabFill = b.activeTabFill;
             activeTabText = b.activeTabText;
             inactiveTabText = b.inactiveTabText;
@@ -87,13 +85,12 @@ public final class TerminalThemeSpec {
         /** Values mirror the PR #6 neoterm_* tokens (OLED Obsidian). */
         public static Builder defaults() {
             return new Builder()
-                .pillSurface("#CC18181B")
+                .pillSurface("#C718181B")
                 .dockSurface("#CC141417")
                 .menuSurface("#E618181B")
                 .stroke("#26FFFFFF")
                 .softFill("#24FFFFFF")
                 .inactiveTabFill("#14FFFFFF")
-                .ambientGlow("#18FFFFFF")
                 .activeTabFill("#FFFFFF")
                 .activeTabText("#09090B")
                 .inactiveTabText("#A1A1AA")
@@ -108,7 +105,7 @@ public final class TerminalThemeSpec {
 
         public static final class Builder {
             int pillSurface, dockSurface, menuSurface, stroke, softFill, inactiveTabFill;
-            int ambientGlow, activeTabFill, activeTabText, inactiveTabText;
+            int activeTabFill, activeTabText, inactiveTabText;
             int activeClose, inactiveClose, keycapFill, keycapStroke, keycapText;
             int statusIdle, statusBusy;
 
@@ -118,7 +115,6 @@ public final class TerminalThemeSpec {
             public Builder stroke(String v) { stroke = Argb.parse(v); return this; }
             public Builder softFill(String v) { softFill = Argb.parse(v); return this; }
             public Builder inactiveTabFill(String v) { inactiveTabFill = Argb.parse(v); return this; }
-            public Builder ambientGlow(String v) { ambientGlow = Argb.parse(v); return this; }
             public Builder activeTabFill(String v) { activeTabFill = Argb.parse(v); return this; }
             public Builder activeTabText(String v) { activeTabText = Argb.parse(v); return this; }
             public Builder inactiveTabText(String v) { inactiveTabText = Argb.parse(v); return this; }

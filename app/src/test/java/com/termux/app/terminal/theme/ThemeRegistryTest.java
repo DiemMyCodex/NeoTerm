@@ -60,10 +60,10 @@ public class ThemeRegistryTest {
         for (TerminalThemeSpec theme : ThemeRegistry.all()) {
             TerminalThemeSpec.Chrome c = theme.chrome;
             // Glass surfaces and glow are translucent; actionable fills/text are opaque.
-            Assert.assertTrue("pillSurface alpha for " + theme.id, alpha(c.pillSurface) > 0 && alpha(c.pillSurface) < 0xFF);
+            // ~78% opaque glass: translucent enough for terminal rows to show through.
+            Assert.assertEquals("pillSurface alpha for " + theme.id, 0xC7, alpha(c.pillSurface));
             Assert.assertTrue("dockSurface alpha for " + theme.id, alpha(c.dockSurface) > 0 && alpha(c.dockSurface) < 0xFF);
             Assert.assertTrue("menuSurface alpha for " + theme.id, alpha(c.menuSurface) > 0 && alpha(c.menuSurface) < 0xFF);
-            Assert.assertTrue("ambientGlow alpha for " + theme.id, alpha(c.ambientGlow) > 0 && alpha(c.ambientGlow) < 0xFF);
             Assert.assertTrue("stroke alpha for " + theme.id, alpha(c.stroke) > 0 && alpha(c.stroke) < 0xFF);
             Assert.assertEquals(0xFF, alpha(c.activeTabFill));
             Assert.assertEquals(0xFF, alpha(c.activeTabText));
@@ -83,8 +83,7 @@ public class ThemeRegistryTest {
         Assert.assertEquals(Argb.parse("#000000"), t.background);
         Assert.assertEquals(Argb.parse("#F4F4F5"), t.foreground);
         Assert.assertEquals(Argb.parse("#38BDF8"), t.cursor);
-        Assert.assertEquals(Argb.parse("#CC18181B"), t.chrome.pillSurface);
-        Assert.assertEquals(Argb.parse("#18FFFFFF"), t.chrome.ambientGlow);
+        Assert.assertEquals(Argb.parse("#C718181B"), t.chrome.pillSurface);
         Assert.assertEquals(Argb.parse("#FFFFFF"), t.chrome.activeTabFill);
         Assert.assertEquals(Argb.parse("#09090B"), t.chrome.activeTabText);
         Assert.assertEquals(Argb.parse("#1F1F23"), t.chrome.keycapFill);
@@ -104,8 +103,7 @@ public class ThemeRegistryTest {
         Assert.assertEquals(Argb.parse("#89B4FA"), t.ansiColor(4));
         Assert.assertEquals(Argb.parse("#CBA6F7"), t.ansiColor(5));
         Assert.assertEquals(Argb.parse("#94E2D5"), t.ansiColor(6));
-        Assert.assertEquals(Argb.parse("#CC181825"), t.chrome.pillSurface);
-        Assert.assertEquals(Argb.parse("#26CBA6F7"), t.chrome.ambientGlow);
+        Assert.assertEquals(Argb.parse("#C7181825"), t.chrome.pillSurface);
         Assert.assertEquals(Argb.parse("#CBA6F7"), t.chrome.activeTabFill);
         Assert.assertEquals(Argb.parse("#11111B"), t.chrome.activeTabText);
         Assert.assertEquals(Argb.parse("#1E1E2E"), t.chrome.keycapFill);
@@ -125,8 +123,7 @@ public class ThemeRegistryTest {
         Assert.assertEquals(Argb.parse("#7AA2F7"), t.ansiColor(4));
         Assert.assertEquals(Argb.parse("#BB9AF7"), t.ansiColor(5));
         Assert.assertEquals(Argb.parse("#7DCFFF"), t.ansiColor(6));
-        Assert.assertEquals(Argb.parse("#CC16161E"), t.chrome.pillSurface);
-        Assert.assertEquals(Argb.parse("#267AA2F7"), t.chrome.ambientGlow);
+        Assert.assertEquals(Argb.parse("#C716161E"), t.chrome.pillSurface);
         Assert.assertEquals(Argb.parse("#7AA2F7"), t.chrome.activeTabFill);
         Assert.assertEquals(Argb.parse("#16161E"), t.chrome.activeTabText);
         Assert.assertEquals(Argb.parse("#1F2335"), t.chrome.keycapFill);
@@ -146,8 +143,7 @@ public class ThemeRegistryTest {
         Assert.assertEquals(Argb.parse("#BD93F9"), t.ansiColor(4));
         Assert.assertEquals(Argb.parse("#FF79C6"), t.ansiColor(5));
         Assert.assertEquals(Argb.parse("#8BE9FD"), t.ansiColor(6));
-        Assert.assertEquals(Argb.parse("#CC191A21"), t.chrome.pillSurface);
-        Assert.assertEquals(Argb.parse("#26BD93F9"), t.chrome.ambientGlow);
+        Assert.assertEquals(Argb.parse("#C7191A21"), t.chrome.pillSurface);
         Assert.assertEquals(Argb.parse("#BD93F9"), t.chrome.activeTabFill);
         Assert.assertEquals(Argb.parse("#191A21"), t.chrome.activeTabText);
         Assert.assertEquals(Argb.parse("#282A36"), t.chrome.keycapFill);

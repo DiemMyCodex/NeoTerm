@@ -3,7 +3,6 @@ package com.termux.app.terminal.theme;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.InsetDrawable;
@@ -71,6 +70,7 @@ public final class ThemeApplier {
             .apply();
 
         applyTerminalPalette(theme);
+        applyRootBackground(theme);
         applyChrome(theme);
         applyAdapter(theme);
         applyKeycaps(theme);
@@ -113,6 +113,24 @@ public final class ThemeApplier {
         if (emulator != null) emulator.mColors.reset();
     }
 
+    /**
+     * The terminal canvas now spans the full viewport, so the container behind it must carry
+     * the theme background instead of a hardcoded black banner/divider color.
+     */
+    private void applyRootBackground(TerminalThemeSpec theme) {
+        int[] roots = {
+            R.id.activity_termux_root_view,
+            R.id.activity_termux_root_relative_layout,
+            R.id.terminal_content_container
+        };
+        for (int id : roots) {
+            View root = mActivity.findViewById(id);
+            if (root != null) root.setBackgroundColor(theme.background);
+        }
+        TerminalView view = mActivity.getTerminalView();
+        if (view != null) view.setBackgroundColor(theme.background);
+    }
+
     private void applyChrome(TerminalThemeSpec theme) {
         TerminalThemeSpec.Chrome c = theme.chrome;
         int hairline = mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_hairline);
@@ -122,9 +140,6 @@ public final class ThemeApplier {
 
         View dock = mActivity.findViewById(R.id.terminal_extra_keys_dock);
         tintShape(dock, c.dockSurface, c.stroke, hairline);
-
-        View glow = mActivity.findViewById(R.id.terminal_top_ambient_glow);
-        tintGradient(glow, c.ambientGlow);
 
         ImageButton paletteButton = mActivity.findViewById(R.id.theme_switcher_button);
         tintShape(paletteButton, c.softFill, c.stroke, hairline);
@@ -183,15 +198,6 @@ public final class ThemeApplier {
         } else if (drawable instanceof InsetDrawable) {
             Drawable child = ((InsetDrawable) drawable).getDrawable();
             if (child != null) tintShapeDrawable(child, fill, stroke, strokeWidth);
-        }
-    }
-
-    private static void tintGradient(View view, int color) {
-        if (view == null) return;
-        Drawable background = view.getBackground();
-        if (background instanceof GradientDrawable) {
-            GradientDrawable shape = (GradientDrawable) background.mutate();
-            shape.setColors(new int[] {color, Color.TRANSPARENT});
         }
     }
 }

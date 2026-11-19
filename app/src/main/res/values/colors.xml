@@ -11,7 +11,7 @@
     <color name="extra_key_active_background">#FF2E2E34</color>
 
     <!-- 2026 Liquid Glass chrome. Values are identical to the pre-token literals. -->
-    <color name="neoterm_glass_surface">#CC18181B</color>
+    <color name="neoterm_glass_surface">#C718181B</color>
     <color name="neoterm_glass_menu_surface">#E618181B</color>
     <color name="neoterm_glass_dock_surface">#CC141417</color>
     <color name="neoterm_glass_stroke">#26FFFFFF</color>
