@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.termux.R;
 import com.termux.app.TermuxActivity;
+import com.termux.app.terminal.theme.TerminalThemeSpec;
 import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.terminal.TerminalSession;
 
@@ -59,10 +60,14 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
     private final Map<String, Boolean> mForegroundStates = new HashMap<>();
     private final SessionProcessMonitor mProcessMonitor;
 
-    private final int mActiveTextColor;
-    private final int mInactiveTextColor;
-    private final int mActiveCloseColor;
-    private final int mInactiveCloseColor;
+    private int mActiveTextColor;
+    private int mInactiveTextColor;
+    private int mActiveCloseColor;
+    private int mInactiveCloseColor;
+    private int mActiveTabFill;
+    private int mInactiveTabFill;
+    private Drawable mMenuBackground;
+    private final int mTabCornerRadiusPx;
 
     /** Read by the monitor's background thread; replaced only on the main thread. */
     private volatile List<TermuxSession> mSessions = Collections.emptyList();
@@ -80,12 +85,49 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         mInactiveTextColor = ContextCompat.getColor(activity, R.color.neoterm_tab_text_inactive);
         mActiveCloseColor = ContextCompat.getColor(activity, R.color.neoterm_tab_close_active);
         mInactiveCloseColor = ContextCompat.getColor(activity, R.color.neoterm_tab_close_inactive);
+        mActiveTabFill = ContextCompat.getColor(activity, R.color.neoterm_tab_active_fill);
+        mInactiveTabFill = ContextCompat.getColor(activity, R.color.neoterm_glass_inner_fill);
+        mTabCornerRadiusPx = activity.getResources().getDimensionPixelSize(R.dimen.neoterm_tab_corner_radius);
+        mMenuBackground = ContextCompat.getDrawable(activity, R.drawable.session_menu_background);
 
         // /proc scanning stays on the monitor's daemon thread; only the diff result is
         // hopped to the main looper, and only when a pill actually changes state.
         mProcessMonitor = new SessionProcessMonitor(
             () -> SessionProcessMonitor.scanSessions(mSessions),
             changed -> mMainHandler.post(() -> applyForegroundChanges(changed)));
+    }
+
+    /**
+     * Recolor tab pills, labels, close glyphs, status dots and the long-press menu from the
+     * active theme. Invoked synchronously on selection and on creation — never from a loop.
+     */
+    public void applyTheme(@NonNull TerminalThemeSpec.Chrome chrome) {
+        mActiveTextColor = chrome.activeTabText;
+        mInactiveTextColor = chrome.inactiveTabText;
+        mActiveCloseColor = chrome.activeClose;
+        mInactiveCloseColor = chrome.inactiveClose;
+        mActiveTabFill = chrome.activeTabFill;
+        mInactiveTabFill = chrome.inactiveTabFill;
+        mIdleDotColor = chrome.statusIdle;
+        mBusyDotColor = chrome.statusBusy;
+
+        GradientDrawable menu = new GradientDrawable();
+        menu.setShape(GradientDrawable.RECTANGLE);
+        menu.setCornerRadius(mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_menu_corner_radius));
+        menu.setColor(chrome.menuSurface);
+        menu.setStroke(mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_hairline), chrome.stroke);
+        mMenuBackground = menu;
+
+        notifyDataSetChanged();
+    }
+
+    /** A fresh rounded pill drawable for one tab state. */
+    private Drawable tabBackground(boolean active) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setCornerRadius(mTabCornerRadiusPx);
+        drawable.setColor(active ? mActiveTabFill : mInactiveTabFill);
+        return drawable;
     }
 
     /** Resume /proc polling when the activity becomes visible. */
@@ -220,6 +262,7 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         boolean isActive = session != null && session == current;
 
         holder.itemView.setSelected(isActive);
+        holder.itemView.setBackground(tabBackground(isActive));
         holder.title.setTextColor(isActive ? mActiveTextColor : mInactiveTextColor);
         holder.title.setTypeface(null, isActive ? Typeface.BOLD : Typeface.NORMAL);
         holder.title.setText(SessionTabUiLogic.buildLabel(position,
@@ -278,12 +321,22 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         final boolean[] actionSelected = {false};
         final ListPopupWindow popup = new ListPopupWindow(mActivity);
         popup.setAnchorView(anchor);
-        popup.setAdapter(new ArrayAdapter<>(mActivity, R.layout.item_session_menu, labels));
+        popup.setAdapter(new ArrayAdapter<String>(mActivity, R.layout.item_session_menu, labels) {
+            @NonNull
+            @Override
+            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                // The menu sits on dark glass, so use the light/accent fill, not the dark
+                // text color reserved for the active tab pill.
+                if (view instanceof TextView) ((TextView) view).setTextColor(mActiveTabFill);
+                return view;
+            }
+        });
         popup.setWidth(Math.max(anchor.getWidth(),
             mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_tab_menu_width)));
         popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         popup.setModal(true);
-        popup.setBackgroundDrawable(ContextCompat.getDrawable(mActivity, R.drawable.session_menu_background));
+        popup.setBackgroundDrawable(mMenuBackground);
         popup.setOnItemClickListener((parent, view, position, id) -> {
             actionSelected[0] = true;
             popup.dismiss();

@@ -25,4 +25,7 @@
     <color name="neoterm_tab_icon">#FFF4F4F5</color>
     <color name="neoterm_ambient_glow_start">#143B82F6</color>
     <color name="neoterm_ambient_glow_end">#00000000</color>
+
+    <!-- Live theme switcher chrome. Overridden at runtime by the active TerminalThemeSpec. -->
+    <color name="neoterm_theme_menu_surface">#E618181B</color>
 </resources>

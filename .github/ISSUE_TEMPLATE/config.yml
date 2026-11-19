@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Want ask questions about the project?
-    url: https://github.com/termux/termux-app/discussions
-    about: Join GitHub Discussions
+  - name: Question or discussion
+    url: https://github.com/DiemMyCodex/NeoTerm/discussions
+    about: Ask questions and share setups with the NeoTerm community
+  - name: Upstream Termux docs
+    url: https://wiki.termux.com/wiki/Terminal_Settings
+    about: Documentation for the underlying Termux engine and packages

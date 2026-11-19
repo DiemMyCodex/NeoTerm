@@ -21,6 +21,10 @@ import java.util.stream.Collectors;
 
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
+import android.graphics.drawable.LayerDrawable;
 import android.util.TypedValue;
 import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
@@ -180,6 +184,12 @@ public final class ExtraKeysView extends GridLayout {
      * {@link #DEFAULT_BUTTON_ACTIVE_BACKGROUND_COLOR}. */
     protected int mButtonActiveBackgroundColor;
 
+    /** Runtime keycap palette. Until a theme is applied the static neoterm_keycap_* drawables
+     * are left untouched, so this is purely additive to the existing 2026 glass chrome. */
+    private int mThemedKeycapFill;
+    private int mThemedKeycapStroke;
+    private boolean mHasThemedKeycaps = false;
+
     /** Defines whether text for the extra keys button should be all capitalized automatically. */
     protected boolean mButtonTextAllCaps = true;
 
@@ -310,6 +320,62 @@ public final class ExtraKeysView extends GridLayout {
         button.setBackgroundResource(R.drawable.extra_key_button_background);
         button.setTextColor(mButtonTextColor);
         button.setTypeface(Typeface.MONOSPACE);
+        tintKeycapBackground(button);
+    }
+
+    /**
+     * Apply a synchronized theme to all visible keycaps. Only GradientDrawable fill/stroke and
+     * text colors are changed — keycap geometry, weights, ripple behavior and focus posture are
+     * left exactly as they are. Safe to call repeatedly and on every keycap state swap.
+     */
+    public void applyThemeKeycaps(int fill, int stroke, int textColor, int activeTextColor) {
+        mThemedKeycapFill = fill;
+        mThemedKeycapStroke = stroke;
+        mHasThemedKeycaps = true;
+        setButtonColors(textColor, activeTextColor, fill, fill);
+
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child instanceof MaterialButton) {
+                MaterialButton button = (MaterialButton) child;
+                button.setTextColor(mButtonTextColor);
+                tintKeycapBackground(button);
+            }
+        }
+
+        // Special buttons have their own neutral/active/locked palette; re-run the official
+        // styling path so their text weight and color stay consistent with the new theme.
+        for (SpecialButtonState state : mSpecialButtons.values()) {
+            for (MaterialButton button : state.buttons) {
+                applyKeycapStyle(button, state.isActive, state.isLocked);
+                tintKeycapBackground(button);
+            }
+        }
+        invalidate();
+    }
+
+    /** Retint the shape inside a (possibly nested) ripple/layer drawable. */
+    private void tintKeycapBackground(MaterialButton button) {
+        if (mHasThemedKeycaps) tintDrawable(button.getBackground());
+    }
+
+    private void tintDrawable(Drawable drawable) {
+        if (drawable instanceof GradientDrawable) {
+            GradientDrawable shape = (GradientDrawable) drawable.mutate();
+            shape.setColor(mThemedKeycapFill);
+            shape.setStroke(getResources().getDimensionPixelSize(R.dimen.neoterm_keycap_stroke_width),
+                mThemedKeycapStroke);
+        } else if (drawable instanceof LayerDrawable) {
+            // RippleDrawable extends LayerDrawable on API 21+.
+            LayerDrawable layer = (LayerDrawable) drawable;
+            for (int i = 0; i < layer.getNumberOfLayers(); i++) {
+                Drawable child = layer.getDrawable(i);
+                if (child != null) tintDrawable(child);
+            }
+        } else if (drawable instanceof InsetDrawable) {
+            Drawable child = ((InsetDrawable) drawable).getDrawable();
+            if (child != null) tintDrawable(child);
+        }
     }
 
     /** Apply the neutral / active / locked keycap palette to a modifier button. */
@@ -327,6 +393,7 @@ public final class ExtraKeysView extends GridLayout {
             button.setTextColor(mButtonTextColor);
             button.setTypeface(Typeface.MONOSPACE);
         }
+        tintKeycapBackground(button);
     }
 
     /** Swap keycap backgrounds for press feedback without destroying the ripple drawables. */
@@ -344,6 +411,8 @@ public final class ExtraKeysView extends GridLayout {
             view.setBackgroundResource(pressed
                 ? R.drawable.extra_key_button_pressed_background
                 : R.drawable.extra_key_button_background);
+
+        if (view instanceof MaterialButton) tintKeycapBackground((MaterialButton) view);
     }
 
     private int dpToPx(int dp) {

@@ -62,6 +62,10 @@ public class TerminalToolbarViewPager {
                 extraKeysView.reload(mActivity.getTermuxTerminalExtraKeys().getExtraKeysInfo(),
                     mActivity.getTerminalToolbarDefaultHeight());
 
+                // Newly instantiated pages must inherit the active theme's keycap palette.
+                if (mActivity.getThemeApplier() != null)
+                    mActivity.getThemeApplier().applyKeycapsTo(extraKeysView);
+
                 // apply extra keys fix if enabled in prefs
                 if (mActivity.getProperties().isUsingFullScreen() && mActivity.getProperties().isUsingFullScreenWorkAround()) {
                     FullScreenWorkAround.apply(mActivity);

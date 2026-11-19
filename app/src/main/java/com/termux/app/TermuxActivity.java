@@ -52,6 +52,8 @@ import com.termux.app.activities.SettingsActivity;
 import com.termux.shared.termux.crash.TermuxCrashUtils;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
 import com.termux.app.terminal.TermuxSessionsListViewController;
+import com.termux.app.terminal.theme.ThemeApplier;
+import com.termux.app.terminal.theme.ThemeSwitcherPopup;
 import com.termux.app.terminal.io.TerminalToolbarViewPager;
 import com.termux.app.terminal.TermuxTerminalViewClient;
 import com.termux.shared.termux.extrakeys.ExtraKeysView;
@@ -152,6 +154,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
      * The persistent top tab bar adapter. Backed by the service-owned session list.
      */
     TermuxSessionTabAdapter mSessionTabAdapter;
+
+    /** Synchronous 2026 theme engine: palette + glass chrome + keycaps, no polling. */
+    private ThemeApplier mThemeApplier;
+    private ThemeSwitcherPopup mThemeSwitcherPopup;
 
     /**
      * The {@link TermuxActivity} broadcast receiver for various things like terminal style configuration changes.
@@ -279,6 +285,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setNewSessionButtonView();
 
         setToggleKeyboardView();
+
+        // All chrome views exist now: restore the persisted theme in one synchronous pass.
+        // This runs after the styling client has read ~/.termux/colors.properties so the
+        // curated 2026 theme is authoritative on every cold launch.
+        if (mThemeApplier != null) mThemeApplier.applyPersisted();
 
         registerForContextMenu(mTerminalView);
 
@@ -474,6 +485,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+
+        // Emulators are created lazily once the service is bound. Reapply so a session
+        // instantiated before onCreate's pass still picks up the curated palette.
+        if (mThemeApplier != null) mThemeApplier.applyPersisted();
     }
 
     @Override
@@ -564,6 +579,18 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mSessionTabAdapter = new TermuxSessionTabAdapter(this);
         mSessionTabAdapter.attachTo(sessionTabsRecyclerView);
 
+        mThemeApplier = new ThemeApplier(this);
+        mThemeSwitcherPopup = new ThemeSwitcherPopup(this, mThemeApplier);
+
+        View themeSwitcherButton = findViewById(R.id.theme_switcher_button);
+        if (themeSwitcherButton != null) {
+            themeSwitcherButton.setOnTouchListener(new TactilePressTouchListener());
+            themeSwitcherButton.setOnClickListener(v -> {
+                // The popup is non-focusable; focus is reclaimed by its dismissal callback.
+                mThemeSwitcherPopup.show(v);
+            });
+        }
+
         View newSessionTabButton = findViewById(R.id.new_session_tab_button);
         if (newSessionTabButton != null) {
             newSessionTabButton.setOnTouchListener(new TactilePressTouchListener());
@@ -572,6 +599,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 restoreTerminalFocusAndIme(shouldRestoreIme());
             });
         }
+    }
+
+    /** The floating pill adapter, exposed so the theme engine can recolor it in place. */
+    public TermuxSessionTabAdapter getSessionTabAdapter() {
+        return mSessionTabAdapter;
+    }
+
+    /** The synchronous theme engine used by the palette button and the styling reload path. */
+    public ThemeApplier getThemeApplier() {
+        return mThemeApplier;
     }
 
     /**
@@ -1210,6 +1247,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onReloadActivityStyling();
+
+        // checkForFontAndColors() above restores the user's colors.properties defaults.
+        // Re-apply the curated theme so adding a session or reloading styling cannot undo it.
+        if (mThemeApplier != null) mThemeApplier.applyPersisted();
 
         // To change the activity and drawer theme, activity needs to be recreated.
         // It will destroy the activity, including all stored variables and views, and onCreate()
