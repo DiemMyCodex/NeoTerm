@@ -75,25 +75,21 @@ jobs:
           export TERMUX_APK_VERSION_TAG="$APK_TAG"
           export TERMUX_PACKAGE_VARIANT="apt-android-7"
 
-          echo "::group::Build ARM64 (ABI split)"
+          # splits.abi.reset()+include('arm64-v8a') with universalApk true produces both
+          # the ABI split and a single-file ARM64 APK in one pass. Never disable splits
+          # here: AGP then ignores the include list and tries to build armeabi-v7a, whose
+          # bootstrap-arm.zip this ARM64-only fork does not ship.
+          echo "::group::Build ARM64 split + universal APK"
           ./gradlew assembleDebug
           echo "::endgroup::"
 
-          ARM64="$SRC/${PREFIX}_arm64-v8a.apk"
-          if [ ! -f "$ARM64" ]; then
-            echo "Missing $ARM64"; ls -la "$SRC"; exit 1
-          fi
-          cp "$ARM64" "$DIST/"
-
-          echo "::group::Build universal (splits disabled)"
-          TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS=0 ./gradlew assembleDebug
-          echo "::endgroup::"
-
-          UNIVERSAL="$SRC/${PREFIX}_universal.apk"
-          if [ ! -f "$UNIVERSAL" ]; then
-            echo "Missing $UNIVERSAL"; ls -la "$SRC"; exit 1
-          fi
-          cp "$UNIVERSAL" "$DIST/"
+          for ABI in arm64-v8a universal; do
+            APK="$SRC/${PREFIX}_${ABI}.apk"
+            if [ ! -f "$APK" ]; then
+              echo "Missing $APK"; ls -la "$SRC"; exit 1
+            fi
+            cp "$APK" "$DIST/"
+          done
 
           echo "::group::Generate SHA256SUMS.txt"
           (cd "$DIST" && sha256sum *.apk > SHA256SUMS.txt)
