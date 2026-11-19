@@ -20,7 +20,7 @@ import com.termux.R;
 import com.termux.app.TermuxActivity;
 import com.termux.app.TermuxService;
 import com.termux.app.terminal.TermuxSessionTabAdapter;
-import com.termux.shared.shell.command.runner.terminal.TermuxSession;
+import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.shared.termux.extrakeys.ExtraKeysView;
 import com.termux.terminal.TerminalColors;
 import com.termux.terminal.TerminalEmulator;
@@ -153,7 +153,7 @@ public final class ThemeApplier {
 
     private void applyKeycapsToViewHierarchy(View view, TerminalThemeSpec.Chrome c) {
         if (view instanceof ExtraKeysView) {
-            view.applyThemeKeycaps(c.keycapFill, c.keycapStroke, c.keycapText, c.keycapText);
+            ((ExtraKeysView) view).applyThemeKeycaps(c.keycapFill, c.keycapStroke, c.keycapText, c.keycapText);
             return;
         }
         if (view instanceof ViewGroup) {
