@@ -1,6 +1,5 @@
 package com.termux.app;
 
-import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -27,6 +26,7 @@ import android.view.animation.DecelerateInterpolator;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -192,15 +192,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     /** Raised height of the extra keys pager before the quick collapse toggle shrinks it. */
     private int mTerminalToolbarExpandedHeightPx;
 
-    /** Full dock width in pixels, captured before the first collapse so it can be restored. */
-    private int mExtraKeysDockExpandedWidthPx = -1;
-
     private View mTerminalExtraKeysDock;
     private ImageButton mExtraKeysCollapseButton;
-    private ValueAnimator mExtraKeysHeightAnimator;
     private boolean mExtraKeysCollapsed;
 
-    private static final int EXTRA_KEYS_COLLAPSE_MS = 200;
+    private static final int EXTRA_KEYS_COLLAPSE_MS = 180;
+    private static final int EXTRA_KEYS_EXPAND_ALPHA_MS = 160;
 
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
     private static final int CONTEXT_MENU_SHARE_TRANSCRIPT_ID = 1;
@@ -388,10 +385,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         if (mSessionTabAdapter != null) mSessionTabAdapter.release();
-        if (mExtraKeysHeightAnimator != null) {
-            mExtraKeysHeightAnimator.cancel();
-            mExtraKeysHeightAnimator = null;
-        }
 
         if (mTermuxService != null) {
             // Do not leave service and session clients with references to activity.
@@ -690,42 +683,43 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         final View dock = getTerminalExtraKeysDock();
         if (terminalToolbarViewPager == null || dock == null) return;
 
-        if (mExtraKeysHeightAnimator != null) mExtraKeysHeightAnimator.cancel();
-
-        // Capture the real expanded width once, before any collapse shrinks the dock.
-        if (mExtraKeysDockExpandedWidthPx <= 0) {
-            int measured = dock.getWidth();
-            if (measured <= 0) {
-                measured = getResources().getDisplayMetrics().widthPixels -
-                    2 * Math.round(getResources().getDimension(R.dimen.extra_keys_dock_side_margin));
-            }
-            mExtraKeysDockExpandedWidthPx = measured;
-        }
-
         final ViewGroup.LayoutParams dockParams = dock.getLayoutParams();
-        final int startWidth = (dockParams.width == ViewGroup.LayoutParams.MATCH_PARENT ||
-            dockParams.width == ViewGroup.LayoutParams.WRAP_CONTENT)
-            ? mExtraKeysDockExpandedWidthPx : dockParams.width;
-        final int endWidth = collapsed
-            ? Math.round(getResources().getDimension(R.dimen.extra_keys_collapsed_dock_width))
-            : mExtraKeysDockExpandedWidthPx;
-        final int startHeight = terminalToolbarViewPager.getLayoutParams().height;
-        final int endHeight = collapsed ? 0 : mTerminalToolbarExpandedHeightPx;
+        final ViewGroup.LayoutParams pageParams = terminalToolbarViewPager.getLayoutParams();
 
-        // Shrink the whole glass pill (not just the page). Animating only the page
-        // left a full-width dark dock with nothing in it.
-        mExtraKeysHeightAnimator = ValueAnimator.ofFloat(0f, 1f);
-        mExtraKeysHeightAnimator.setDuration(EXTRA_KEYS_COLLAPSE_MS);
-        mExtraKeysHeightAnimator.setInterpolator(new DecelerateInterpolator());
-        mExtraKeysHeightAnimator.addUpdateListener(animation -> {
-            float fraction = (Float) animation.getAnimatedValue();
-            dockParams.width = Math.round(startWidth + (endWidth - startWidth) * fraction);
+        if (collapsed) {
+            // Never animate the width of a ViewPager: LayoutTransition/width tweens
+            // leave its child GridLayout stuck at a tiny measured width, which is
+            // what clips the row down to a single letter on the next expand.
+            terminalToolbarViewPager.setVisibility(View.GONE);
+            dockParams.width = ViewGroup.LayoutParams.WRAP_CONTENT;
             dock.setLayoutParams(dockParams);
-            ViewGroup.LayoutParams pageParams = terminalToolbarViewPager.getLayoutParams();
-            pageParams.height = Math.round(startHeight + (endHeight - startHeight) * fraction);
+            dock.requestLayout();
+        } else {
+            dockParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            dock.setLayoutParams(dockParams);
+
+            // Re-seat the weighted 0dp + weight=1 contract explicitly before the
+            // pager is measured again.
+            pageParams.width = 0;
+            pageParams.height = mTerminalToolbarExpandedHeightPx;
+            if (pageParams instanceof LinearLayout.LayoutParams)
+                ((LinearLayout.LayoutParams) pageParams).weight = 1f;
             terminalToolbarViewPager.setLayoutParams(pageParams);
-        });
-        mExtraKeysHeightAnimator.start();
+            terminalToolbarViewPager.setVisibility(View.VISIBLE);
+
+            terminalToolbarViewPager.setAlpha(0f);
+            terminalToolbarViewPager.animate().alpha(1f)
+                .setDuration(EXTRA_KEYS_EXPAND_ALPHA_MS).start();
+
+            dock.requestLayout();
+            terminalToolbarViewPager.post(() -> {
+                terminalToolbarViewPager.requestLayout();
+                View extraKeysView = terminalToolbarViewPager.findViewById(R.id.terminal_toolbar_extra_keys);
+                if (extraKeysView != null) extraKeysView.requestLayout();
+                // Force the adapter to re-measure its page at the restored width.
+                terminalToolbarViewPager.setCurrentItem(terminalToolbarViewPager.getCurrentItem(), false);
+            });
+        }
 
         if (mExtraKeysCollapseButton != null) {
             mExtraKeysCollapseButton.animate()

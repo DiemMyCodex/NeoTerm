@@ -198,13 +198,17 @@
 
         <!-- Floating glass dock. The pager is the FIRST child and owns all remaining
              width (0dp + weight=1); the chevron is the SECOND child. Symmetric 6dp
-             padding and baselineAligned=false stop LinearLayout from collapsing the
-             weighted page. Collapsing shrinks the whole dock to a compact pill. -->
+             padding and baselineAligned=false keep the weighted page full width.
+             Collapse hides the pager and shrinks the dock to WRAP_CONTENT; alignParentEnd
+             pins that compact pill to the right edge. animateLayoutChanges stays OFF:
+             a LayoutTransition on this container breaks ViewPager child measurement. -->
         <LinearLayout
             android:id="@+id/terminal_extra_keys_dock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:animateLayoutChanges="false"
             android:layout_marginStart="@dimen/extra_keys_dock_side_margin"
             android:layout_marginEnd="@dimen/extra_keys_dock_side_margin"
             android:layout_marginBottom="8dp"

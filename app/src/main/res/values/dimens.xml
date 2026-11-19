@@ -7,6 +7,4 @@
     <dimen name="extra_keys_dock_height">80dp</dimen>
     <!-- Never let two weighted rows shrink enough to clip key labels. -->
     <dimen name="extra_keys_dock_min_height">76dp</dimen>
-    <!-- Collapsed dock: 34dp chevron + 6dp marginStart + 6dp padding on each side. -->
-    <dimen name="extra_keys_collapsed_dock_width">52dp</dimen>
 </resources>

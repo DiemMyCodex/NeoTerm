@@ -27,11 +27,11 @@
 
     <TextView
         android:id="@+id/session_tab_title"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="match_parent"
-        android:layout_weight="1"
+        android:maxWidth="160dp"
         android:gravity="center_vertical"
-        android:maxLines="1"
+        android:singleLine="true"
         android:ellipsize="end"
         android:textSize="13sp"
         android:focusable="false"
