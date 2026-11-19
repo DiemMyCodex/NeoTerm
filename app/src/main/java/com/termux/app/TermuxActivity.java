@@ -426,7 +426,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setTermuxSessionsListView();
 
         // Bind the tab bar to the exact same service-owned list, no copy.
-        if (mSessionTabAdapter != null) mSessionTabAdapter.setSessions(mTermuxService.getTermuxSessions());
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.setSessions(mTermuxService.getTermuxSessions());
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
 
         final Intent intent = getIntent();
         setIntent(null);
@@ -601,7 +604,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     public void onTerminalSessionSwitched() {
         if (mTerminalView == null) return;
 
-        if (mSessionTabAdapter != null) mSessionTabAdapter.notifyDataSetChanged();
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.notifyDataSetChanged();
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
 
         mTerminalView.animate().cancel();
         mTerminalView.setAlpha(0.88f);
@@ -1061,7 +1067,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         if (mTermuxSessionListViewController != null) mTermuxSessionListViewController.notifyDataSetChanged();
-        if (mSessionTabAdapter != null) mSessionTabAdapter.notifyDataSetChanged();
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.notifyDataSetChanged();
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
     }
 
     public boolean isVisible() {

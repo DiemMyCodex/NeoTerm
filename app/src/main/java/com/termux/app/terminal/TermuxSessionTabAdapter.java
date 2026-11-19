@@ -24,6 +24,7 @@ import androidx.appcompat.widget.ListPopupWindow;
 import androidx.core.content.ContextCompat;
 import androidx.core.widget.ImageViewCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.termux.R;
@@ -115,7 +116,7 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
             @Override
             public void onItemRangeInserted(int positionStart, int itemCount) {
                 mLastItemCount = getItemCount();
-                scrollToLastTab(recyclerView);
+                ensureActiveTabFullyVisible();
             }
 
             @Override
@@ -123,24 +124,63 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
                 // TermuxService notifies with notifyDataSetChanged() when a session is created,
                 // so count comparison is needed to detect a genuinely new tab.
                 int count = getItemCount();
-                if (count > mLastItemCount) scrollToLastTab(recyclerView);
+                if (count > mLastItemCount) ensureActiveTabFullyVisible();
                 mLastItemCount = count;
             }
         });
     }
 
-    private void scrollToLastTab(@NonNull RecyclerView recyclerView) {
-        recyclerView.post(() -> {
-            int last = getItemCount() - 1;
-            if (last >= 0) recyclerView.smoothScrollToPosition(last);
+    /**
+     * Park the active pill flush with the trailing edge. When the active tab is the last one,
+     * nothing remains to its right, so getRightFadingEdgeStrength() is 0 and its white pill and
+     * X button can never be dimmed by the fading edge.
+     */
+    public void ensureActiveTabFullyVisible() {
+        if (mRecyclerView == null) return;
+        mRecyclerView.post(() -> {
+            int count = getItemCount();
+            if (count == 0) return;
+            RecyclerView.LayoutManager lm = mRecyclerView.getLayoutManager();
+            if (!(lm instanceof LinearLayoutManager)) return;
+
+            int active = getActiveSessionPosition();
+            alignTabToEnd((LinearLayoutManager) lm, active >= 0 ? active : count - 1);
         });
+    }
+
+    private void alignTabToEnd(@NonNull LinearLayoutManager layoutManager, int position) {
+        View child = layoutManager.findViewByPosition(position);
+        if (child == null) {
+            // Not measured yet: let the LayoutManager resolve the target, then snap to end.
+            LinearSmoothScroller scroller = new LinearSmoothScroller(mRecyclerView.getContext()) {
+                @Override protected int getHorizontalSnapPreference() {
+                    return SNAP_TO_END;
+                }
+            };
+            scroller.setTargetPosition(position);
+            layoutManager.startSmoothScroll(scroller);
+            return;
+        }
+        int contentWidth = mRecyclerView.getWidth()
+            - mRecyclerView.getPaddingLeft() - mRecyclerView.getPaddingRight();
+        layoutManager.scrollToPositionWithOffset(position, contentWidth - child.getWidth());
+    }
+
+    private int getActiveSessionPosition() {
+        TerminalSession current = mActivity.getCurrentSession();
+        if (current == null) return -1;
+        for (int i = 0; i < mSessions.size(); i++) {
+            TerminalSession session = getTerminalSessionAt(i);
+            if (session == current) return i;
+        }
+        return -1;
     }
 
     /** Keep the currently selected pill visible after creation or switch. */
     private void scrollToActiveTab(int position) {
         if (position < 0 || position == mLastActivePosition || mRecyclerView == null) return;
         mLastActivePosition = position;
-        mRecyclerView.post(() -> mRecyclerView.smoothScrollToPosition(position));
+        ensureActiveTabFullyVisible();
     }
 
     @NonNull
