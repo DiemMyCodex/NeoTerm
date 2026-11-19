@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to publish (e.g. v1.0.0). Leave blank to build from the current SHA.'
+        description: 'Tag to publish (e.g. v1.22.2). Leave blank to build from the current SHA.'
         required: false
         type: string
 
@@ -168,7 +168,7 @@ jobs:
             echo "::group::apksigner verify --verbose $APK"
             "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$APK.verify.txt"
             # apksigner verify alone accepts a v1-only APK; require all three schemes
-            # explicitly so the broken publish from v1.0.0-glass cannot recur.
+            # explicitly so the earlier v1-only signing incident cannot recur.
             grep -q 'Verified using v1 scheme (JAR signing): true' "$APK.verify.txt"
             grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' "$APK.verify.txt"
             grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' "$APK.verify.txt"
