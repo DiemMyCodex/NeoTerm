@@ -294,6 +294,9 @@ public final class ExtraKeysView extends GridLayout {
     /** Common pill keycap geometry/shared styling. Repeat, swipe-up and lock logic is untouched. */
     private void styleKeycap(MaterialButton button) {
         button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        // A too-narrow key must ellipsize, never wrap into a clipped first letter.
+        button.setMaxLines(1);
+        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
         button.setPadding(0, 0, 0, 0);
         button.setMinHeight(0);
         button.setMinimumHeight(0);
@@ -534,6 +537,8 @@ public final class ExtraKeysView extends GridLayout {
                     }
                 });
 
+                // Keep keycaps at 0dp and let GridLayout split every column/row
+                // equally (weight=1f). Fixed widths here are what clip labels.
                 LayoutParams param = new GridLayout.LayoutParams();
                 param.width = 0;
                 if(Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP) {

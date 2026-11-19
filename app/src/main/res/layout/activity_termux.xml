@@ -196,9 +196,10 @@
 
         </androidx.drawerlayout.widget.DrawerLayout>
 
-        <!-- Floating glass dock: 36dp keycaps + 3dp padding = 42dp row, plus
-             10dp side margins and 8dp bottom margin. The chevron collapses the
-             pager height to 0 without stealing focus from the terminal. -->
+        <!-- Floating glass dock: the pager takes all remaining width (weight=1)
+             to the left of the chevron. Two 40dp rows give an 80dp glass dock,
+             with 10dp side margins and an 8dp bottom margin. The chevron
+             collapses the pager height to 0 without stealing terminal focus. -->
         <LinearLayout
             android:id="@+id/terminal_extra_keys_dock"
             android:layout_width="match_parent"
@@ -223,7 +224,7 @@
             <androidx.viewpager.widget.ViewPager
                 android:id="@+id/terminal_toolbar_view_pager"
                 android:layout_width="0dp"
-                android:layout_height="36dp"
+                android:layout_height="@dimen/extra_keys_dock_height"
                 android:layout_weight="1"
                 android:layout_marginEnd="2dp"
                 android:background="@null"

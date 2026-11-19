@@ -43,6 +43,18 @@ public class TerminalToolbarViewPager {
             View layout;
             if (position == 0) {
                 layout = inflater.inflate(R.layout.view_terminal_toolbar_extra_keys, collection, false);
+
+                // The dock gives the pager width=0dp + weight=1. Make the page itself
+                // explicitly fill that width; otherwise GridLayout can measure its
+                // weighted 0dp columns at zero and collapse every keycap into one letter.
+                ViewGroup.LayoutParams pageParams = layout.getLayoutParams();
+                if (pageParams == null)
+                    pageParams = new ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+                pageParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                pageParams.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                layout.setLayoutParams(pageParams);
+
                 ExtraKeysView extraKeysView = (ExtraKeysView) layout;
                 extraKeysView.setExtraKeysViewClient(mActivity.getTermuxTerminalExtraKeys());
                 extraKeysView.setButtonTextAllCaps(mActivity.getProperties().shouldExtraKeysTextBeAllCaps());

@@ -627,8 +627,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTerminalExtraKeysDock != null && mPreferences.shouldShowTerminalToolbar())
             mTerminalExtraKeysDock.setVisibility(View.VISIBLE);
 
-        ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
-        mTerminalToolbarDefaultHeight = layoutParams.height;
+        // Base each row on a real density-independent height instead of the pager's
+        // XML placeholder. Two rows now produce an 80dp dock, not a clipped 72dp one.
+        mTerminalToolbarDefaultHeight = getResources().getDimension(R.dimen.extra_keys_row_height);
 
         setTerminalToolbarHeight();
 
@@ -646,9 +647,16 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
         if (terminalToolbarViewPager == null) return;
 
-        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight *
-            (mTermuxTerminalExtraKeys.getExtraKeysInfo() == null ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length) *
+        int rows = mTermuxTerminalExtraKeys.getExtraKeysInfo() == null
+            ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length;
+        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight * rows *
             mProperties.getTerminalToolbarHeightScaleFactor());
+        if (rows >= 2) {
+            // Keep two weighted rows tall enough for 12sp monospace labels even if a
+            // stale toolbar height scale preference tries to shrink them.
+            expandedHeight = Math.max(expandedHeight,
+                Math.round(getResources().getDimension(R.dimen.extra_keys_dock_min_height)));
+        }
         mTerminalToolbarExpandedHeightPx = expandedHeight;
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
