@@ -199,9 +199,12 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         }
 
         if (!term.isMouseTrackingActive() && !e.isFromSource(InputDevice.SOURCE_MOUSE)) {
-            if (!KeyboardUtils.areDisableSoftKeyboardFlagsSet(mActivity))
-                KeyboardUtils.showSoftKeyboard(mActivity, mActivity.getTerminalView());
-            else
+            if (!KeyboardUtils.areDisableSoftKeyboardFlagsSet(mActivity)) {
+                // TerminalView#onSingleTapUp already calls requestFocus(), but the focus may be
+                // stolen by chrome afterwards. Reassert it and post an explicit IME show so a
+                // single tap always reopens the keyboard.
+                mActivity.restoreTerminalFocusAndIme(true);
+            } else
                 Logger.logVerbose(LOG_TAG, "Not showing soft keyboard onSingleTapUp since its disabled");
         }
     }

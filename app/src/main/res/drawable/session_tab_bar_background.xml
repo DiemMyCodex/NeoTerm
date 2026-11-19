@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating glass pill used by the top session tab bar. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/neoterm_pill_corner_radius" />
+    <solid android:color="@color/neoterm_glass_surface" />
+    <stroke
+        android:width="@dimen/neoterm_hairline"
+        android:color="@color/neoterm_glass_stroke" />
+</shape>

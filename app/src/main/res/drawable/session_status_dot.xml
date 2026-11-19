@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Idle shell default; the adapter tints this to amber while a child owns the tty. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <size
+        android:width="@dimen/neoterm_status_dot_size"
+        android:height="@dimen/neoterm_status_dot_size" />
+    <solid android:color="@color/session_status_idle" />
+</shape>

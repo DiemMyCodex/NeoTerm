@@ -19,6 +19,9 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.util.TypedValue;
 import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -119,7 +122,7 @@ public final class ExtraKeysView extends GridLayout {
     public static final int ATTR_BUTTON_ACTIVE_BACKGROUND_COLOR = R.attr.extraKeysButtonActiveBackgroundColor;
 
     /** Defines the default fallback value for {@link #mButtonTextColor} if {@link #ATTR_BUTTON_TEXT_COLOR} is undefined. */
-    public static final int DEFAULT_BUTTON_TEXT_COLOR = 0xFFFFFFFF;
+    public static final int DEFAULT_BUTTON_TEXT_COLOR = 0xFFF4F4F5;
     /** Defines the default fallback value for {@link #mButtonActiveTextColor} if {@link #ATTR_BUTTON_ACTIVE_TEXT_COLOR} is undefined. */
     public static final int DEFAULT_BUTTON_ACTIVE_TEXT_COLOR = 0xFF80DEEA;
     /** Defines the default fallback value for {@link #mButtonBackgroundColor} if {@link #ATTR_BUTTON_BACKGROUND_COLOR} is undefined. */
@@ -212,6 +215,11 @@ public final class ExtraKeysView extends GridLayout {
     public ExtraKeysView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
+        // The extra keys bar is chrome: it must never steal focus from TerminalView.
+        setFocusable(false);
+        setFocusableInTouchMode(false);
+        setDescendantFocusability(FOCUS_BLOCK_DESCENDANTS);
+
         setRepetitiveKeys(ExtraKeysConstants.PRIMARY_REPETITIVE_KEYS);
         setSpecialButtons(getDefaultSpecialButtons(this));
 
@@ -281,6 +289,66 @@ public final class ExtraKeysView extends GridLayout {
         mButtonActiveTextColor = buttonActiveTextColor;
         mButtonBackgroundColor = buttonBackgroundColor;
         mButtonActiveBackgroundColor = buttonActiveBackgroundColor;
+    }
+
+    /** Common pill keycap geometry/shared styling. Repeat, swipe-up and lock logic is untouched. */
+    private void styleKeycap(MaterialButton button) {
+        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        // A too-narrow key must ellipsize, never wrap into a clipped first letter.
+        button.setMaxLines(1);
+        button.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // A sliver of horizontal inset keeps glyphs off the keycap stroke while
+        // still letting all seven weighted columns share the full dock width.
+        int keyPaddingX = dpToPx(2);
+        button.setPadding(keyPaddingX, 0, keyPaddingX, 0);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setFocusable(false);
+        button.setFocusableInTouchMode(false);
+        button.setBackgroundResource(R.drawable.extra_key_button_background);
+        button.setTextColor(mButtonTextColor);
+        button.setTypeface(Typeface.MONOSPACE);
+    }
+
+    /** Apply the neutral / active / locked keycap palette to a modifier button. */
+    public void applyKeycapStyle(MaterialButton button, boolean active, boolean locked) {
+        if (locked) {
+            button.setBackgroundResource(R.drawable.extra_key_button_locked_background);
+            button.setTextColor(Color.WHITE);
+            button.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
+        } else if (active) {
+            button.setBackgroundResource(R.drawable.extra_key_button_active_background);
+            button.setTextColor(mButtonActiveTextColor);
+            button.setTypeface(Typeface.MONOSPACE);
+        } else {
+            button.setBackgroundResource(R.drawable.extra_key_button_background);
+            button.setTextColor(mButtonTextColor);
+            button.setTypeface(Typeface.MONOSPACE);
+        }
+    }
+
+    /** Swap keycap backgrounds for press feedback without destroying the ripple drawables. */
+    private void setKeycapPressed(View view, ExtraKeyButton buttonInfo, boolean pressed) {
+        if (!(view instanceof MaterialButton)) return;
+
+        SpecialButtonState state = isSpecialButton(buttonInfo)
+            ? mSpecialButtons.get(SpecialButton.valueOf(buttonInfo.getKey())) : null;
+
+        if (state != null && state.isLocked)
+            view.setBackgroundResource(R.drawable.extra_key_button_locked_background);
+        else if (state != null && state.isActive)
+            view.setBackgroundResource(R.drawable.extra_key_button_active_background);
+        else
+            view.setBackgroundResource(pressed
+                ? R.drawable.extra_key_button_pressed_background
+                : R.drawable.extra_key_button_background);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
+            getResources().getDisplayMetrics()));
     }
 
 
@@ -410,19 +478,22 @@ public final class ExtraKeysView extends GridLayout {
                 }
 
                 button.setText(buttonInfo.getDisplay());
-                button.setTextColor(mButtonTextColor);
                 button.setAllCaps(mButtonTextAllCaps);
-                button.setPadding(0, 0, 0, 0);
+                styleKeycap(button);
+                if (isSpecialButton(buttonInfo)) {
+                    SpecialButtonState state = mSpecialButtons.get(SpecialButton.valueOf(buttonInfo.getKey()));
+                    if (state != null) applyKeycapStyle(button, state.isActive, state.isLocked);
+                }
 
-                button.setOnClickListener(view -> {
-                    performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
-                    onAnyExtraKeyButtonClick(view, buttonInfo, button);
-                });
+                button.setOnClickListener(view -> onAnyExtraKeyButtonClick(view, buttonInfo, button));
 
                 button.setOnTouchListener((view, event) -> {
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
-                            view.setBackgroundColor(mButtonActiveBackgroundColor);
+                            // One crisp tick per physical press, including modifier locks and
+                            // swipe-up popup keys. Auto-repeat adds its own ticks below.
+                            performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
+                            setKeycapPressed(view, buttonInfo, true);
                             // Start long press scheduled executors which will be stopped in next MotionEvent
                             startScheduledExecutors(view, buttonInfo, button);
                             return true;
@@ -432,23 +503,23 @@ public final class ExtraKeysView extends GridLayout {
                                 // Show popup on swipe up
                                 if (mPopupWindow == null && event.getY() < 0) {
                                     stopScheduledExecutors();
-                                    view.setBackgroundColor(mButtonBackgroundColor);
+                                    setKeycapPressed(view, buttonInfo, false);
                                     showPopup(view, buttonInfo.getPopup());
                                 }
                                 if (mPopupWindow != null && event.getY() > 0) {
-                                    view.setBackgroundColor(mButtonActiveBackgroundColor);
+                                    setKeycapPressed(view, buttonInfo, true);
                                     dismissPopup();
                                 }
                             }
                             return true;
 
                         case MotionEvent.ACTION_CANCEL:
-                            view.setBackgroundColor(mButtonBackgroundColor);
+                            setKeycapPressed(view, buttonInfo, false);
                             stopScheduledExecutors();
                             return true;
 
                         case MotionEvent.ACTION_UP:
-                            view.setBackgroundColor(mButtonBackgroundColor);
+                            setKeycapPressed(view, buttonInfo, false);
                             stopScheduledExecutors();
                             // If ACTION_UP up was not from a repetitive key or was with a key with a popup button
                             if (mLongPressCount == 0 || mPopupWindow != null) {
@@ -469,16 +540,17 @@ public final class ExtraKeysView extends GridLayout {
                     }
                 });
 
-                LayoutParams param = new GridLayout.LayoutParams();
+                // Give every column and row an equal weight and let GridLayout do
+                // the math. width/height MUST be 0 for weights to apply; a positive
+                // or WRAP_CONTENT value pins keys to their intrinsic width and
+                // collapses the seven-column row into a single clipped letter.
+                LayoutParams param = new GridLayout.LayoutParams(
+                    GridLayout.spec(row, GridLayout.FILL, 1f),
+                    GridLayout.spec(col, GridLayout.FILL, 1f));
                 param.width = 0;
-                if(Build.VERSION.SDK_INT == Build.VERSION_CODES.LOLLIPOP) {
-                   param.height = (int)(heightPx + 0.5);
-                } else {
-                    param.height = 0;
-                }
-                param.setMargins(0, 0, 0, 0);
-                param.columnSpec = GridLayout.spec(col, GridLayout.FILL, 1.f);
-                param.rowSpec = GridLayout.spec(row, GridLayout.FILL, 1.f);
+                param.height = 0;
+                int keyMargin = getResources().getDimensionPixelSize(R.dimen.neoterm_keycap_margin);
+                param.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
                 button.setLayoutParams(param);
 
                 addView(button);
@@ -541,6 +613,7 @@ public final class ExtraKeysView extends GridLayout {
             mScheduledExecutor = Executors.newSingleThreadScheduledExecutor();
             mScheduledExecutor.scheduleWithFixedDelay(() -> {
                 mLongPressCount++;
+                view.post(() -> performExtraKeyButtonHapticFeedback(view, buttonInfo, button));
                 onExtraKeyButtonClick(view, buttonInfo, button);
             }, mLongPressTimeout, mLongPressRepeatDelay, TimeUnit.MILLISECONDS);
         } else if (isSpecialButton(buttonInfo)) {
@@ -599,14 +672,10 @@ public final class ExtraKeysView extends GridLayout {
         }
         button.setText(extraButton.getDisplay());
         button.setAllCaps(mButtonTextAllCaps);
-        button.setPadding(0, 0, 0, 0);
-        button.setMinHeight(0);
-        button.setMinWidth(0);
-        button.setMinimumWidth(0);
-        button.setMinimumHeight(0);
+        styleKeycap(button);
         button.setWidth(width);
         button.setHeight(height);
-        button.setBackgroundColor(mButtonActiveBackgroundColor);
+        button.setBackgroundResource(R.drawable.extra_key_button_active_background);
         mPopupWindow = new PopupWindow(this);
         mPopupWindow.setWidth(LayoutParams.WRAP_CONTENT);
         mPopupWindow.setHeight(LayoutParams.WRAP_CONTENT);
@@ -659,7 +728,8 @@ public final class ExtraKeysView extends GridLayout {
         if (state == null) return null;
         state.setIsCreated(true);
         MaterialButton button = new MaterialButton(getContext(), null, android.R.attr.buttonBarButtonStyle);
-        button.setTextColor(state.isActive ? mButtonActiveTextColor : mButtonTextColor);
+        styleKeycap(button);
+        applyKeycapStyle(button, state.isActive, state.isLocked);
         if (needUpdate) {
             state.buttons.add(button);
         }

@@ -16,21 +16,27 @@ import android.os.Looper;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.DecelerateInterpolator;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
+import com.termux.app.terminal.ExtraKeysDockState;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
+import com.termux.app.terminal.TactilePressTouchListener;
 import com.termux.app.terminal.TermuxSessionTabAdapter;
 import com.termux.app.terminal.io.TermuxTerminalExtraKeys;
 import com.termux.shared.activities.ReportActivity;
@@ -55,6 +61,7 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.settings.properties.TermuxAppSharedProperties;
 import com.termux.shared.termux.theme.TermuxThemeUtils;
 import com.termux.shared.theme.NightMode;
+import com.termux.shared.view.KeyboardUtils;
 import com.termux.shared.view.ViewUtils;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -183,6 +190,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private float mTerminalToolbarDefaultHeight;
 
+    /** Raised height of the extra keys pager before the quick collapse toggle shrinks it. */
+    private int mTerminalToolbarExpandedHeightPx;
+
+    private View mTerminalExtraKeysDock;
+    private ImageButton mExtraKeysCollapseButton;
+    private boolean mExtraKeysCollapsed;
+
+    private static final int EXTRA_KEYS_COLLAPSE_MS = 180;
+    private static final int EXTRA_KEYS_EXPAND_ALPHA_MS = 160;
 
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
     private static final int CONTEXT_MENU_SHARE_TRANSCRIPT_ID = 1;
@@ -201,6 +217,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private static final String ARG_ACTIVITY_RECREATED = "activity_recreated";
 
     private static final String LOG_TAG = "TermuxActivity";
+
+    /** Cross-fade duration when a different shell is attached to the terminal view. */
+    private static final long SESSION_SWITCH_FADE_MS = 110L;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -299,6 +318,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mIsVisible = true;
 
+        // Status dots are live only while the activity is on screen.
+        if (mSessionTabAdapter != null) mSessionTabAdapter.startPolling();
+
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
 
@@ -325,6 +347,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalViewClient != null)
             mTermuxTerminalViewClient.onResume();
 
+        // The tab bar and extra keys are non-focusable chrome; explicitly reclaim focus and
+        // re-trigger the IME on every foreground transition. #keyboard-regression
+        restoreTerminalFocusAndIme(shouldRestoreIme());
+
         // Check if a crash happened on last run of the app or if a plugin crashed and show a
         // notification with the crash details if it did
         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(this, LOG_TAG);
@@ -341,6 +367,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = false;
+
+        // Stop /proc polling so no CPU or battery is spent in the background.
+        if (mSessionTabAdapter != null) mSessionTabAdapter.stopPolling();
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -361,6 +390,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         Logger.logDebug(LOG_TAG, "onDestroy");
 
         if (mIsInvalidState) return;
+
+        if (mSessionTabAdapter != null) mSessionTabAdapter.release();
 
         if (mTermuxService != null) {
             // Do not leave service and session clients with references to activity.
@@ -402,7 +433,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setTermuxSessionsListView();
 
         // Bind the tab bar to the exact same service-owned list, no copy.
-        if (mSessionTabAdapter != null) mSessionTabAdapter.setSessions(mTermuxService.getTermuxSessions());
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.setSessions(mTermuxService.getTermuxSessions());
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
 
         final Intent intent = getIntent();
         setIntent(null);
@@ -532,19 +566,63 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         View newSessionTabButton = findViewById(R.id.new_session_tab_button);
         if (newSessionTabButton != null) {
+            newSessionTabButton.setOnTouchListener(new TactilePressTouchListener());
             newSessionTabButton.setOnClickListener(v -> {
                 mTermuxTerminalSessionActivityClient.addNewSession(false, null);
-                restoreTerminalFocus();
+                restoreTerminalFocusAndIme(shouldRestoreIme());
             });
         }
     }
 
     /**
-     * Restore focus to {@link #mTerminalView} only if it actually lost it. Calling requestFocus()
-     * on an already-focused view fires no focus change, so the soft keyboard stays put.
+     * Single entry point for reclaiming terminal focus after any chrome interaction.
+     * requestFocus() is unconditional: calling it on an already-focused view fires no focus
+     * change, so the IME is posted explicitly when {@code showIme} is true.
      */
+    public void restoreTerminalFocusAndIme(boolean showIme) {
+        if (mTerminalView == null) return;
+
+        mTerminalView.requestFocus();
+
+        if (showIme) {
+            mTerminalView.post(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(mTerminalView, InputMethodManager.SHOW_IMPLICIT);
+            });
+        }
+    }
+
+    /** Kept for callers that only need focus, never an IME show. */
     public void restoreTerminalFocus() {
-        if (mTerminalView != null && !mTerminalView.hasFocus()) mTerminalView.requestFocus();
+        restoreTerminalFocusAndIme(false);
+    }
+
+    /** Respect the user's soft-keyboard preferences before force-showing the IME. */
+    public boolean shouldRestoreIme() {
+        if (KeyboardUtils.areDisableSoftKeyboardFlagsSet(this)) return false;
+        if (mPreferences != null && !mPreferences.isSoftKeyboardEnabled()) return false;
+        return mProperties == null || !mProperties.shouldSoftKeyboardBeHiddenOnStartup();
+    }
+
+    /**
+     * Called by the session client whenever a different shell is attached. Runs the subtle
+     * cross-fade, repaints the active tab and re-asserts focus after the switch.
+     */
+    public void onTerminalSessionSwitched() {
+        if (mTerminalView == null) return;
+
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.notifyDataSetChanged();
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
+
+        mTerminalView.animate().cancel();
+        mTerminalView.setAlpha(0.88f);
+        mTerminalView.animate()
+            .alpha(1f)
+            .setDuration(SESSION_SWITCH_FADE_MS)
+            .setInterpolator(new DecelerateInterpolator())
+            .start();
     }
 
 
@@ -553,11 +631,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mTermuxTerminalExtraKeys = new TermuxTerminalExtraKeys(this, mTerminalView,
             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
 
+        mTerminalExtraKeysDock = findViewById(R.id.terminal_extra_keys_dock);
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (mPreferences.shouldShowTerminalToolbar()) terminalToolbarViewPager.setVisibility(View.VISIBLE);
+        if (mTerminalExtraKeysDock != null && mPreferences.shouldShowTerminalToolbar())
+            mTerminalExtraKeysDock.setVisibility(View.VISIBLE);
 
-        ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
-        mTerminalToolbarDefaultHeight = layoutParams.height;
+        // Base each row on a real density-independent height instead of the pager's
+        // XML placeholder. Two rows now produce an 80dp dock, not a clipped 72dp one.
+        mTerminalToolbarDefaultHeight = getResources().getDimension(R.dimen.extra_keys_row_height);
 
         setTerminalToolbarHeight();
 
@@ -567,27 +648,113 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         terminalToolbarViewPager.setAdapter(new TerminalToolbarViewPager.PageAdapter(this, savedTextInput));
         terminalToolbarViewPager.addOnPageChangeListener(new TerminalToolbarViewPager.OnPageChangeListener(this, terminalToolbarViewPager));
+
+        setExtraKeysCollapseToggle();
     }
 
     private void setTerminalToolbarHeight() {
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
         if (terminalToolbarViewPager == null) return;
 
+        int rows = mTermuxTerminalExtraKeys.getExtraKeysInfo() == null
+            ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length;
+        // A zero/negative row count or scale must never reach the multiplication:
+        // it produces a 0/-1/-2 page height and every weighted GridLayout column
+        // then measures at zero, leaving a single clipped key next to the chevron.
+        rows = Math.max(1, rows);
+        float scale = mProperties.getTerminalToolbarHeightScaleFactor();
+        if (scale <= 0) scale = 1f;
+        int expandedHeight = Math.round(mTerminalToolbarDefaultHeight * rows * scale);
+        int minHeight = Math.round(getResources().getDimension(rows >= 2
+            ? R.dimen.extra_keys_dock_min_height : R.dimen.extra_keys_row_height));
+        expandedHeight = Math.max(expandedHeight, minHeight);
+        mTerminalToolbarExpandedHeightPx = expandedHeight;
+
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
-        layoutParams.height = Math.round(mTerminalToolbarDefaultHeight *
-            (mTermuxTerminalExtraKeys.getExtraKeysInfo() == null ? 0 : mTermuxTerminalExtraKeys.getExtraKeysInfo().getMatrix().length) *
-            mProperties.getTerminalToolbarHeightScaleFactor());
+        layoutParams.height = mExtraKeysCollapsed ? 0 : expandedHeight;
         terminalToolbarViewPager.setLayoutParams(layoutParams);
     }
 
-    public void toggleTerminalToolbar() {
+    /** Compact chevron: collapses the keycaps to 0px so long output gets the full viewport. */
+    private void setExtraKeysCollapseToggle() {
+        mExtraKeysCollapseButton = findViewById(R.id.extra_keys_collapse_button);
+        if (mExtraKeysCollapseButton == null) return;
+
+        mExtraKeysCollapseButton.setOnTouchListener(new TactilePressTouchListener());
+        mExtraKeysCollapseButton.setOnClickListener(v -> {
+            v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            setExtraKeysCollapsed(!mExtraKeysCollapsed);
+            restoreTerminalFocusAndIme(shouldRestoreIme());
+        });
+    }
+
+    private void setExtraKeysCollapsed(boolean collapsed) {
+        if (mExtraKeysCollapsed == collapsed) return;
+
+        mExtraKeysCollapsed = collapsed;
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (terminalToolbarViewPager == null) return;
+        final View dock = getTerminalExtraKeysDock();
+        if (terminalToolbarViewPager == null || dock == null) return;
+
+        final ViewGroup.LayoutParams dockParams = dock.getLayoutParams();
+        final ViewGroup.LayoutParams pageParams = terminalToolbarViewPager.getLayoutParams();
+        final ExtraKeysDockState target = ExtraKeysDockState.forCollapsed(collapsed);
+
+        if (collapsed) {
+            // Never animate the width of a ViewPager: LayoutTransition/width tweens
+            // leave its child GridLayout stuck at a tiny measured width, which is
+            // what clips the row down to a single letter on the next expand.
+            terminalToolbarViewPager.setVisibility(target.pagerVisibility);
+            dockParams.width = target.dockWidth;
+            dock.setLayoutParams(dockParams);
+            dock.requestLayout();
+        } else {
+            dockParams.width = target.dockWidth;
+            dock.setLayoutParams(dockParams);
+
+            // Re-seat the weighted 0dp + weight=1 contract explicitly before the
+            // pager is measured again.
+            pageParams.width = target.pagerWidth;
+            pageParams.height = mTerminalToolbarExpandedHeightPx;
+            if (pageParams instanceof LinearLayout.LayoutParams)
+                ((LinearLayout.LayoutParams) pageParams).weight = target.pagerWeight;
+            terminalToolbarViewPager.setLayoutParams(pageParams);
+            terminalToolbarViewPager.setVisibility(target.pagerVisibility);
+
+            terminalToolbarViewPager.setAlpha(0f);
+            terminalToolbarViewPager.animate().alpha(1f)
+                .setDuration(EXTRA_KEYS_EXPAND_ALPHA_MS).start();
+
+            dock.requestLayout();
+            terminalToolbarViewPager.post(() -> {
+                terminalToolbarViewPager.requestLayout();
+                View extraKeysView = terminalToolbarViewPager.findViewById(R.id.terminal_toolbar_extra_keys);
+                if (extraKeysView != null) extraKeysView.requestLayout();
+                // Force the adapter to re-measure its page at the restored width.
+                terminalToolbarViewPager.setCurrentItem(terminalToolbarViewPager.getCurrentItem(), false);
+            });
+        }
+
+        if (mExtraKeysCollapseButton != null) {
+            mExtraKeysCollapseButton.animate()
+                .rotation(collapsed ? 180f : 0f)
+                .setDuration(EXTRA_KEYS_COLLAPSE_MS)
+                .start();
+            mExtraKeysCollapseButton.setContentDescription(getString(collapsed
+                ? R.string.action_expand_extra_keys : R.string.action_collapse_extra_keys));
+        }
+    }
+
+    public void toggleTerminalToolbar() {
+        final View dock = getTerminalExtraKeysDock();
+        if (dock == null) return;
 
         final boolean showNow = mPreferences.toogleShowTerminalToolbar();
         Logger.showToast(this, (showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar)), true);
-        terminalToolbarViewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
-        if (showNow && isTerminalToolbarTextInputViewSelected()) {
+        dock.setVisibility(showNow ? View.VISIBLE : View.GONE);
+        if (!showNow) {
+            restoreTerminalFocus();
+        } else if (isTerminalToolbarTextInputViewSelected()) {
             // Focus the text input view if just revealed.
             findViewById(R.id.terminal_toolbar_text_input).requestFocus();
         }
@@ -884,6 +1051,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         return (ViewPager) findViewById(R.id.terminal_toolbar_view_pager);
     }
 
+    public View getTerminalExtraKeysDock() {
+        return findViewById(R.id.terminal_extra_keys_dock);
+    }
+
     public float getTerminalToolbarDefaultHeight() {
         return mTerminalToolbarDefaultHeight;
     }
@@ -904,7 +1075,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
 
         if (mTermuxSessionListViewController != null) mTermuxSessionListViewController.notifyDataSetChanged();
-        if (mSessionTabAdapter != null) mSessionTabAdapter.notifyDataSetChanged();
+        if (mSessionTabAdapter != null) {
+            mSessionTabAdapter.notifyDataSetChanged();
+            mSessionTabAdapter.ensureActiveTabFullyVisible();
+        }
     }
 
     public boolean isVisible() {

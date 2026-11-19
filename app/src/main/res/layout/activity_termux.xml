@@ -12,7 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginHorizontal="3dp"
+        android:layout_marginHorizontal="@dimen/neoterm_terminal_horizontal_margin"
         android:layout_marginVertical="0dp"
         android:orientation="vertical">
 
@@ -20,60 +20,114 @@
             android:id="@+id/drawer_layout"
             android:layout_width="match_parent"
             android:layout_alignParentTop="true"
-            android:layout_above="@+id/terminal_toolbar_view_pager"
+            android:layout_above="@+id/terminal_extra_keys_dock"
             android:layout_height="match_parent">
 
+            <!-- IMPORTANT: do NOT put blocksDescendants here. It used to wrap the
+                 TerminalView and prevent it from ever taking focus, which killed
+                 the soft keyboard. Chrome is marked non-focusable individually. -->
             <LinearLayout
                 android:id="@+id/terminal_content_container"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:orientation="vertical"
-                android:descendantFocusability="blocksDescendants"
                 android:focusable="false"
                 android:focusableInTouchMode="false">
 
-                <!-- Persistent top session tab bar. Every child is non-focusable so the
-                     soft keyboard never hides/flickers when tabs are tapped. -->
-                <LinearLayout
-                    android:id="@+id/terminal_session_tab_bar"
+                <!-- 96dp slot gives the ambient glow room to breathe while the pill
+                     itself stays at 44dp. Every child here is non-focusable. -->
+                <FrameLayout
+                    android:id="@+id/terminal_session_tab_bar_slot"
                     android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:background="?attr/termuxActivityDrawerBackground"
+                    android:layout_height="@dimen/neoterm_pill_slot_height"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
                     android:descendantFocusability="blocksDescendants"
                     android:focusable="false"
                     android:focusableInTouchMode="false">
 
-                    <androidx.recyclerview.widget.RecyclerView
-                        android:id="@+id/terminal_session_tabs"
-                        android:layout_width="0dp"
-                        android:layout_height="match_parent"
-                        android:layout_weight="1"
-                        android:descendantFocusability="blocksDescendants"
-                        android:focusable="false"
-                        android:focusableInTouchMode="false"
-                        tools:listitem="@layout/item_session_tab" />
-
-                    <ImageButton
-                        android:id="@+id/new_session_tab_button"
-                        android:layout_width="40dp"
-                        android:layout_height="match_parent"
-                        android:src="@drawable/ic_new_session"
-                        android:background="?attr/selectableItemBackground"
-                        app:tint="?attr/termuxActivityDrawerImageTint"
-                        android:contentDescription="@string/action_new_session"
+                    <View
+                        android:id="@+id/terminal_top_ambient_glow"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/neoterm_pill_slot_height"
+                        android:background="@drawable/top_ambient_glow"
+                        android:clickable="false"
                         android:focusable="false"
                         android:focusableInTouchMode="false" />
 
-                </LinearLayout>
+                    <LinearLayout
+                        android:id="@+id/terminal_session_tab_bar"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/neoterm_pill_height"
+                        android:layout_marginStart="@dimen/neoterm_pill_side_margin"
+                        android:layout_marginEnd="@dimen/neoterm_pill_side_margin"
+                        android:layout_marginTop="@dimen/neoterm_pill_top_margin"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/session_tab_bar_background"
+                        android:elevation="@dimen/neoterm_pill_elevation"
+                        android:paddingStart="@dimen/neoterm_pill_horizontal_padding"
+                        android:paddingEnd="@dimen/neoterm_pill_horizontal_padding"
+                        android:paddingTop="@dimen/neoterm_pill_vertical_padding"
+                        android:paddingBottom="@dimen/neoterm_pill_vertical_padding"
+                        android:descendantFocusability="blocksDescendants"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false">
+
+                        <androidx.recyclerview.widget.RecyclerView
+                            android:id="@+id/terminal_session_tabs"
+                            android:layout_width="0dp"
+                            android:layout_height="@dimen/neoterm_tab_row_height"
+                            android:layout_gravity="center_vertical"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="@dimen/neoterm_tab_gap"
+                            android:paddingStart="0dp"
+                            android:paddingEnd="0dp"
+                            android:paddingTop="0dp"
+                            android:paddingBottom="0dp"
+                            android:clipToPadding="true"
+                            android:requiresFadingEdge="horizontal"
+                            android:fadingEdgeLength="@dimen/neoterm_tab_fading_edge_length"
+                            android:overScrollMode="never"
+                            android:background="@null"
+                            android:descendantFocusability="blocksDescendants"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false"
+                            tools:listitem="@layout/item_session_tab" />
+
+                        <ImageButton
+                            android:id="@+id/new_session_tab_button"
+                            android:layout_width="@dimen/neoterm_chevron_size"
+                            android:layout_height="@dimen/neoterm_chevron_size"
+                            android:layout_marginStart="0dp"
+                            android:layout_marginEnd="2dp"
+                            android:src="@drawable/ic_add_session"
+                            android:background="@drawable/add_session_button_background"
+                            android:scaleType="centerInside"
+                            android:padding="0dp"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            app:tint="@color/session_tab_add_icon"
+                            android:contentDescription="@string/action_new_session"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
+
+                    </LinearLayout>
+
+                </FrameLayout>
 
                 <com.termux.view.TerminalView
                     android:id="@+id/terminal_view"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1"
+                    android:background="@android:color/black"
                     android:defaultFocusHighlightEnabled="false"
+                    android:focusable="true"
                     android:focusableInTouchMode="true"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:clipToPadding="false"
                     android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
                     android:scrollbars="vertical"
                     tools:ignore="UnusedAttribute" />
@@ -141,13 +195,62 @@
 
         </androidx.drawerlayout.widget.DrawerLayout>
 
-        <androidx.viewpager.widget.ViewPager
-            android:id="@+id/terminal_toolbar_view_pager"
-            android:visibility="gone"
+        <!-- Floating glass dock. The pager is the FIRST child and owns all remaining
+             width (0dp + weight=1); the chevron is the SECOND child. Symmetric 6dp
+             padding and baselineAligned=false keep the weighted page full width.
+             Collapse hides the pager and shrinks the dock to WRAP_CONTENT; alignParentEnd
+             pins that compact pill to the right edge. animateLayoutChanges stays OFF:
+             a LayoutTransition on this container breaks ViewPager child measurement. -->
+        <LinearLayout
+            android:id="@+id/terminal_extra_keys_dock"
             android:layout_width="match_parent"
-            android:layout_height="37.5dp"
-            android:background="@color/black"
-            android:layout_alignParentBottom="true" />
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:animateLayoutChanges="false"
+            android:layout_marginStart="@dimen/extra_keys_dock_side_margin"
+            android:layout_marginEnd="@dimen/extra_keys_dock_side_margin"
+            android:layout_marginBottom="@dimen/neoterm_dock_bottom_margin"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false"
+            android:background="@drawable/extra_keys_dock_background"
+            android:elevation="@dimen/neoterm_dock_elevation"
+            android:paddingStart="@dimen/neoterm_dock_padding"
+            android:paddingEnd="@dimen/neoterm_dock_padding"
+            android:paddingTop="@dimen/neoterm_dock_padding"
+            android:paddingBottom="@dimen/neoterm_dock_padding"
+            android:visibility="gone"
+            android:descendantFocusability="blocksDescendants"
+            android:focusable="false"
+            android:focusableInTouchMode="false">
+
+            <androidx.viewpager.widget.ViewPager
+                android:id="@+id/terminal_toolbar_view_pager"
+                android:layout_width="0dp"
+                android:layout_height="@dimen/extra_keys_dock_height"
+                android:layout_weight="1"
+                android:background="@null"
+                android:descendantFocusability="blocksDescendants"
+                android:focusable="false"
+                android:focusableInTouchMode="false" />
+
+            <ImageButton
+                android:id="@+id/extra_keys_collapse_button"
+                android:layout_width="@dimen/neoterm_chevron_size"
+                android:layout_height="@dimen/neoterm_chevron_size"
+                android:layout_marginStart="@dimen/neoterm_tab_gap"
+                android:src="@drawable/ic_chevron_down"
+                android:background="@drawable/extra_keys_toggle_background"
+                android:scaleType="centerInside"
+                android:padding="0dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:contentDescription="@string/action_collapse_extra_keys"
+                android:focusable="false"
+                android:focusableInTouchMode="false" />
+
+        </LinearLayout>
 
     </RelativeLayout>
 

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Active/inactive inner pill. The adapter drives state via setSelected(). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/neoterm_tab_corner_radius" />
+            <solid android:color="@color/neoterm_tab_active_fill" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/neoterm_tab_corner_radius" />
+            <solid android:color="@color/neoterm_glass_inner_fill" />
+        </shape>
+    </item>
+</selector>

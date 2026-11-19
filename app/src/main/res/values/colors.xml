@@ -1,3 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="session_tab_add_icon">#FFFFFFFF</color>
+    <color name="session_status_idle">#FF22C55E</color>
+    <color name="session_status_busy">#FFF59E0B</color>
+
+    <!-- Pill keycap palette shared by both day and night themes. -->
+    <color name="extra_key_text">#FFF4F4F5</color>
+    <color name="extra_key_active_text">#FF60A5FA</color>
+    <color name="extra_key_background">#FF1F1F23</color>
+    <color name="extra_key_active_background">#FF2E2E34</color>
+
+    <!-- 2026 Liquid Glass chrome. Values are identical to the pre-token literals. -->
+    <color name="neoterm_glass_surface">#CC18181B</color>
+    <color name="neoterm_glass_menu_surface">#E618181B</color>
+    <color name="neoterm_glass_dock_surface">#CC141417</color>
+    <color name="neoterm_glass_stroke">#26FFFFFF</color>
+    <color name="neoterm_glass_fill">#24FFFFFF</color>
+    <color name="neoterm_glass_inner_fill">#14FFFFFF</color>
+    <color name="neoterm_tab_active_fill">#FFF4F4F5</color>
+    <color name="neoterm_tab_text_active">#FF09090B</color>
+    <color name="neoterm_tab_text_inactive">#FFA1A1AA</color>
+    <color name="neoterm_tab_close_active">#FF52525B</color>
+    <color name="neoterm_tab_close_inactive">#FF71717A</color>
+    <color name="neoterm_tab_icon">#FFF4F4F5</color>
+    <color name="neoterm_ambient_glow_start">#143B82F6</color>
+    <color name="neoterm_ambient_glow_end">#00000000</color>
 </resources>

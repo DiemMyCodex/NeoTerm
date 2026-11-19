@@ -20,4 +20,16 @@
 
     <color name="blue_link_light">#0969DA</color>
     <color name="blue_link_dark">#58A6FF</color>
+
+    <!-- 2026 Liquid Glass keycap palette. Values match the pre-token literals. -->
+    <color name="neoterm_keycap_fill">#FF1F1F23</color>
+    <color name="neoterm_keycap_stroke">#FF2E2E34</color>
+    <color name="neoterm_keycap_ripple">#26FFFFFF</color>
+    <color name="neoterm_keycap_pressed_fill">#FF27272A</color>
+    <color name="neoterm_keycap_pressed_stroke">#FF3F3F46</color>
+    <color name="neoterm_keycap_pressed_ripple">#3DFFFFFF</color>
+    <color name="neoterm_keycap_active_stroke">#FF60A5FA</color>
+    <color name="neoterm_keycap_active_ripple">#2660A5FA</color>
+    <color name="neoterm_keycap_locked">#FF3B82F6</color>
+    <color name="neoterm_keycap_locked_ripple">#66FFFFFF</color>
 </resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neutral pill keycap. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="@color/neoterm_keycap_ripple">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/neoterm_keycap_corner_radius" />
+            <solid android:color="@color/neoterm_keycap_fill" />
+            <stroke
+                android:width="@dimen/neoterm_keycap_stroke_width"
+                android:color="@color/neoterm_keycap_stroke" />
+        </shape>
+    </item>
+</ripple>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Horizontal inset of the floating extra keys dock. -->
+    <dimen name="extra_keys_dock_side_margin">10dp</dimen>
+    <!-- One extra-keys row. Default layout has two rows, so the dock is 80dp tall. -->
+    <dimen name="extra_keys_row_height">40dp</dimen>
+    <dimen name="extra_keys_dock_height">80dp</dimen>
+    <!-- Never let two weighted rows shrink enough to clip key labels. -->
+    <dimen name="extra_keys_dock_min_height">76dp</dimen>
+
+    <!-- 2026 Liquid Glass chrome. Values are identical to the pre-token literals. -->
+    <dimen name="neoterm_terminal_horizontal_margin">3dp</dimen>
+    <dimen name="neoterm_pill_slot_height">96dp</dimen>
+    <dimen name="neoterm_pill_height">44dp</dimen>
+    <dimen name="neoterm_pill_side_margin">16dp</dimen>
+    <dimen name="neoterm_pill_top_margin">10dp</dimen>
+    <dimen name="neoterm_pill_horizontal_padding">4dp</dimen>
+    <dimen name="neoterm_pill_vertical_padding">5dp</dimen>
+    <dimen name="neoterm_pill_elevation">6dp</dimen>
+    <dimen name="neoterm_pill_corner_radius">999dp</dimen>
+    <dimen name="neoterm_hairline">1dp</dimen>
+    <dimen name="neoterm_tab_row_height">34dp</dimen>
+    <dimen name="neoterm_tab_corner_radius">22dp</dimen>
+    <dimen name="neoterm_tab_gap">6dp</dimen>
+    <dimen name="neoterm_tab_fading_edge_length">8dp</dimen>
+    <dimen name="neoterm_tab_title_max_width">160dp</dimen>
+    <dimen name="neoterm_status_dot_size">6dp</dimen>
+    <dimen name="neoterm_tab_menu_width">196dp</dimen>
+    <dimen name="neoterm_menu_corner_radius">16dp</dimen>
+    <dimen name="neoterm_menu_row_height">44dp</dimen>
+    <dimen name="neoterm_menu_horizontal_padding">16dp</dimen>
+    <dimen name="neoterm_dock_corner_radius">20dp</dimen>
+    <dimen name="neoterm_dock_padding">6dp</dimen>
+    <dimen name="neoterm_dock_bottom_margin">8dp</dimen>
+    <dimen name="neoterm_dock_elevation">8dp</dimen>
+    <dimen name="neoterm_chevron_size">34dp</dimen>
+</resources>
