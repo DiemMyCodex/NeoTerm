@@ -3,14 +3,14 @@
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <corners android:radius="22dp" />
-            <solid android:color="#F4F4F5" />
+            <corners android:radius="@dimen/neoterm_tab_corner_radius" />
+            <solid android:color="@color/neoterm_tab_active_fill" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="22dp" />
-            <solid android:color="#14FFFFFF" />
+            <corners android:radius="@dimen/neoterm_tab_corner_radius" />
+            <solid android:color="@color/neoterm_glass_inner_fill" />
         </shape>
     </item>
 </selector>

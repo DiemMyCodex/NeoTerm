@@ -8,4 +8,9 @@
     <dimen name="content_padding">8dip</dimen>
     <dimen name="content_padding_double">16dip</dimen>
     <dimen name="content_padding_triple">32dip</dimen>
+
+    <!-- 2026 Liquid Glass keycap metrics. Values match the pre-token literals. -->
+    <dimen name="neoterm_keycap_corner_radius">10dp</dimen>
+    <dimen name="neoterm_keycap_stroke_width">1dp</dimen>
+    <dimen name="neoterm_keycap_margin">3dp</dimen>
 </resources>

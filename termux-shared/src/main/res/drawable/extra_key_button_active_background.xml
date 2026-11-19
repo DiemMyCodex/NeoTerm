@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- One-shot active modifier keycap. -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
-    android:color="#2660A5FA">
+    android:color="@color/neoterm_keycap_active_ripple">
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="10dp" />
-            <solid android:color="#27272A" />
+            <corners android:radius="@dimen/neoterm_keycap_corner_radius" />
+            <solid android:color="@color/neoterm_keycap_pressed_fill" />
             <stroke
-                android:width="1dp"
-                android:color="#60A5FA" />
+                android:width="@dimen/neoterm_keycap_stroke_width"
+                android:color="@color/neoterm_keycap_active_stroke" />
         </shape>
     </item>
 </ripple>

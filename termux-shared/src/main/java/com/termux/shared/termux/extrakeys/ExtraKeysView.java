@@ -549,7 +549,7 @@ public final class ExtraKeysView extends GridLayout {
                     GridLayout.spec(col, GridLayout.FILL, 1f));
                 param.width = 0;
                 param.height = 0;
-                int keyMargin = dpToPx(3);
+                int keyMargin = getResources().getDimensionPixelSize(R.dimen.neoterm_keycap_margin);
                 param.setMargins(keyMargin, keyMargin, keyMargin, keyMargin);
                 button.setLayoutParams(param);
 

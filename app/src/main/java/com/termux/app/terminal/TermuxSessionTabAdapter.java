@@ -1,7 +1,6 @@
 package com.termux.app.terminal;
 
 import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -32,6 +31,7 @@ import com.termux.app.TermuxActivity;
 import com.termux.shared.termux.shell.command.runner.terminal.TermuxSession;
 import com.termux.terminal.TerminalSession;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -49,11 +49,6 @@ import java.util.Map;
  */
 public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionTabAdapter.TabViewHolder> {
 
-    private static final int ACTIVE_TEXT_COLOR = Color.parseColor("#09090B");
-    private static final int INACTIVE_TEXT_COLOR = Color.parseColor("#A1A1AA");
-    private static final int ACTIVE_CLOSE_COLOR = Color.parseColor("#52525B");
-    private static final int INACTIVE_CLOSE_COLOR = Color.parseColor("#71717A");
-
     private static final int MENU_RENAME = 0;
     private static final int MENU_DUPLICATE = 1;
     private static final int MENU_CLOSE_OTHERS = 2;
@@ -62,9 +57,15 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
     private final TermuxActivity mActivity;
     private final Handler mMainHandler = new Handler(Looper.getMainLooper());
     private final Map<String, Boolean> mForegroundStates = new HashMap<>();
-    private final SessionProcessMonitor mProcessMonitor = new SessionProcessMonitor();
+    private final SessionProcessMonitor mProcessMonitor;
 
-    private List<TermuxSession> mSessions = Collections.emptyList();
+    private final int mActiveTextColor;
+    private final int mInactiveTextColor;
+    private final int mActiveCloseColor;
+    private final int mInactiveCloseColor;
+
+    /** Read by the monitor's background thread; replaced only on the main thread. */
+    private volatile List<TermuxSession> mSessions = Collections.emptyList();
     private RecyclerView mRecyclerView;
     private int mLastItemCount;
     private int mLastActivePosition = -1;
@@ -75,12 +76,32 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         mActivity = activity;
         mIdleDotColor = ContextCompat.getColor(activity, R.color.session_status_idle);
         mBusyDotColor = ContextCompat.getColor(activity, R.color.session_status_busy);
-        mProcessMonitor.start(() -> mMainHandler.post(() -> refreshForegroundStates(true)));
+        mActiveTextColor = ContextCompat.getColor(activity, R.color.neoterm_tab_text_active);
+        mInactiveTextColor = ContextCompat.getColor(activity, R.color.neoterm_tab_text_inactive);
+        mActiveCloseColor = ContextCompat.getColor(activity, R.color.neoterm_tab_close_active);
+        mInactiveCloseColor = ContextCompat.getColor(activity, R.color.neoterm_tab_close_inactive);
+
+        // /proc scanning stays on the monitor's daemon thread; only the diff result is
+        // hopped to the main looper, and only when a pill actually changes state.
+        mProcessMonitor = new SessionProcessMonitor(
+            () -> SessionProcessMonitor.scanSessions(mSessions),
+            changed -> mMainHandler.post(() -> applyForegroundChanges(changed)));
     }
 
-    /** Stops the /proc poller when the activity is torn down. */
+    /** Resume /proc polling when the activity becomes visible. */
+    public void startPolling() {
+        mProcessMonitor.start();
+    }
+
+    /** Pause /proc polling while the activity is in the background. */
+    public void stopPolling() {
+        mProcessMonitor.stop();
+    }
+
+    /** Permanently stop polling and drop any queued main-thread dot updates. */
     public void release() {
         mProcessMonitor.stop();
+        mMainHandler.removeCallbacksAndMessages(null);
     }
 
     /** Bind to the service-owned session list. Call once after the service connects. */
@@ -100,7 +121,7 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         recyclerView.setFocusable(false);
         recyclerView.setFocusableInTouchMode(false);
 
-        final int gapPx = Math.round(6 * recyclerView.getResources().getDisplayMetrics().density);
+        final int gapPx = mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_tab_gap);
         recyclerView.addItemDecoration(new RecyclerView.ItemDecoration() {
             @Override
             public void getItemOffsets(@NonNull Rect outRect, @NonNull View view,
@@ -169,11 +190,13 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
     private int getActiveSessionPosition() {
         TerminalSession current = mActivity.getCurrentSession();
         if (current == null) return -1;
-        for (int i = 0; i < mSessions.size(); i++) {
-            TerminalSession session = getTerminalSessionAt(i);
-            if (session == current) return i;
+
+        List<String> handles = new ArrayList<>(mSessions.size());
+        for (TermuxSession termuxSession : mSessions) {
+            TerminalSession session = termuxSession == null ? null : termuxSession.getTerminalSession();
+            handles.add(session == null ? null : session.mHandle);
         }
-        return -1;
+        return SessionTabUiLogic.activePosition(handles, current.mHandle);
     }
 
     /** Keep the currently selected pill visible after creation or switch. */
@@ -197,11 +220,13 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         boolean isActive = session != null && session == current;
 
         holder.itemView.setSelected(isActive);
-        holder.title.setTextColor(isActive ? ACTIVE_TEXT_COLOR : INACTIVE_TEXT_COLOR);
+        holder.title.setTextColor(isActive ? mActiveTextColor : mInactiveTextColor);
         holder.title.setTypeface(null, isActive ? Typeface.BOLD : Typeface.NORMAL);
-        holder.title.setText(buildLabel(position, session));
+        holder.title.setText(SessionTabUiLogic.buildLabel(position,
+            session == null ? null : session.mSessionName,
+            session == null ? null : session.getTitle()));
         ImageViewCompat.setImageTintList(holder.close,
-            ColorStateList.valueOf(isActive ? ACTIVE_CLOSE_COLOR : INACTIVE_CLOSE_COLOR));
+            ColorStateList.valueOf(isActive ? mActiveCloseColor : mInactiveCloseColor));
         holder.bindStatus(session, isBusy(session));
 
         if (isActive) scrollToActiveTab(position);
@@ -212,20 +237,6 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         return mSessions.size();
     }
 
-    @NonNull
-    private String buildLabel(int position, @Nullable TerminalSession session) {
-        String prefix = (position + 1) + ": ";
-        if (session == null) return prefix + "?";
-
-        String name = session.mSessionName;
-        if (name != null && !name.isEmpty()) return prefix + name;
-
-        String title = session.getTitle();
-        if (title != null && !title.isEmpty()) return prefix + title;
-
-        return prefix + "shell";
-    }
-
     @Nullable
     private TerminalSession getTerminalSessionAt(int position) {
         if (position < 0 || position >= mSessions.size()) return null;
@@ -233,17 +244,18 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         return termuxSession == null ? null : termuxSession.getTerminalSession();
     }
 
-    private void refreshForegroundStates(boolean notifyIfChanged) {
-        boolean changed = false;
-        for (int i = 0; i < mSessions.size(); i++) {
-            TerminalSession session = getTerminalSessionAt(i);
-            if (session == null) continue;
+    /** Apply a background-computed state diff on the main thread; redraw only if a live tab changed. */
+    private void applyForegroundChanges(@NonNull Map<String, Boolean> changed) {
+        for (Map.Entry<String, Boolean> entry : changed.entrySet())
+            mForegroundStates.put(entry.getKey(), entry.getValue());
 
-            boolean busy = SessionProcessMonitor.isForegroundChildRunning(session);
-            Boolean previous = mForegroundStates.put(session.mHandle, busy);
-            if (previous == null || previous != busy) changed = true;
+        for (TermuxSession termuxSession : mSessions) {
+            TerminalSession session = termuxSession == null ? null : termuxSession.getTerminalSession();
+            if (session != null && changed.containsKey(session.mHandle)) {
+                notifyDataSetChanged();
+                return;
+            }
         }
-        if (changed && notifyIfChanged) notifyDataSetChanged();
     }
 
     private boolean isBusy(@Nullable TerminalSession session) {
@@ -267,7 +279,8 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
         final ListPopupWindow popup = new ListPopupWindow(mActivity);
         popup.setAnchorView(anchor);
         popup.setAdapter(new ArrayAdapter<>(mActivity, R.layout.item_session_menu, labels));
-        popup.setWidth(Math.max(anchor.getWidth(), dpToPx(196)));
+        popup.setWidth(Math.max(anchor.getWidth(),
+            mActivity.getResources().getDimensionPixelSize(R.dimen.neoterm_tab_menu_width)));
         popup.setHeight(ViewGroup.LayoutParams.WRAP_CONTENT);
         popup.setModal(true);
         popup.setBackgroundDrawable(ContextCompat.getDrawable(mActivity, R.drawable.session_menu_background));
@@ -294,10 +307,6 @@ public class TermuxSessionTabAdapter extends RecyclerView.Adapter<TermuxSessionT
             if (!actionSelected[0]) mActivity.restoreTerminalFocusAndIme(mActivity.shouldRestoreIme());
         });
         popup.show();
-    }
-
-    private int dpToPx(int dp) {
-        return Math.round(dp * mActivity.getResources().getDisplayMetrics().density);
     }
 
     class TabViewHolder extends RecyclerView.ViewHolder {

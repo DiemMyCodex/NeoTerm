@@ -33,6 +33,7 @@ import android.widget.Toast;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
+import com.termux.app.terminal.ExtraKeysDockState;
 import com.termux.app.terminal.TermuxActivityRootView;
 import com.termux.app.terminal.TermuxTerminalSessionActivityClient;
 import com.termux.app.terminal.TactilePressTouchListener;
@@ -317,6 +318,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mIsVisible = true;
 
+        // Status dots are live only while the activity is on screen.
+        if (mSessionTabAdapter != null) mSessionTabAdapter.startPolling();
+
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
 
@@ -363,6 +367,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = false;
+
+        // Stop /proc polling so no CPU or battery is spent in the background.
+        if (mSessionTabAdapter != null) mSessionTabAdapter.stopPolling();
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -691,27 +698,28 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         final ViewGroup.LayoutParams dockParams = dock.getLayoutParams();
         final ViewGroup.LayoutParams pageParams = terminalToolbarViewPager.getLayoutParams();
+        final ExtraKeysDockState target = ExtraKeysDockState.forCollapsed(collapsed);
 
         if (collapsed) {
             // Never animate the width of a ViewPager: LayoutTransition/width tweens
             // leave its child GridLayout stuck at a tiny measured width, which is
             // what clips the row down to a single letter on the next expand.
-            terminalToolbarViewPager.setVisibility(View.GONE);
-            dockParams.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+            terminalToolbarViewPager.setVisibility(target.pagerVisibility);
+            dockParams.width = target.dockWidth;
             dock.setLayoutParams(dockParams);
             dock.requestLayout();
         } else {
-            dockParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+            dockParams.width = target.dockWidth;
             dock.setLayoutParams(dockParams);
 
             // Re-seat the weighted 0dp + weight=1 contract explicitly before the
             // pager is measured again.
-            pageParams.width = 0;
+            pageParams.width = target.pagerWidth;
             pageParams.height = mTerminalToolbarExpandedHeightPx;
             if (pageParams instanceof LinearLayout.LayoutParams)
-                ((LinearLayout.LayoutParams) pageParams).weight = 1f;
+                ((LinearLayout.LayoutParams) pageParams).weight = target.pagerWeight;
             terminalToolbarViewPager.setLayoutParams(pageParams);
-            terminalToolbarViewPager.setVisibility(View.VISIBLE);
+            terminalToolbarViewPager.setVisibility(target.pagerVisibility);
 
             terminalToolbarViewPager.setAlpha(0f);
             terminalToolbarViewPager.animate().alpha(1f)
