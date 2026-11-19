@@ -65,7 +65,7 @@ NeoTerm keeps the battle-tested Termux engine — terminal emulator, bootstrap, 
 3. Download **`*_sha256sums`** from the same release and verify:
 
 ```bash
-sha256sum -c termux-app_*_sha256sums
+sha256sum -c neoterm_*_sha256sums
 # expect: <downloaded-apk>: OK
 ```
 

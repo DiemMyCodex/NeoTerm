@@ -19,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Optional release keystore. When absent we reuse the CI debug keystore so
+      # existing installs keep the same signing identity and can upgrade in place.
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
     steps:
       - name: Clone repository
@@ -38,12 +44,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Install exact SDK platform and NDK from gradle.properties
+      - name: Install exact SDK platform, build-tools and NDK from gradle.properties
         shell: bash
         run: |
           COMPILE_SDK_VERSION="$(grep '^compileSdkVersion=' gradle.properties | cut -d= -f2)"
           NDK_VERSION="$(grep '^ndkVersion=' gradle.properties | cut -d= -f2)"
-          sdkmanager "platforms;android-${COMPILE_SDK_VERSION}" "ndk;${NDK_VERSION}"
+          # zipalign/apksigner live in build-tools, not in the platform package.
+          sdkmanager "platforms;android-${COMPILE_SDK_VERSION}" \
+                     "build-tools;${COMPILE_SDK_VERSION}.0.0" \
+                     "ndk;${NDK_VERSION}"
 
       - name: Resolve release tag
         id: meta
@@ -61,7 +70,7 @@ jobs:
           printf 'Releasing tag: %s\n' "$TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Build ARM64 + universal APKs and checksums
+      - name: Build ARM64 + universal APKs
         shell: bash
         run: |
           set -euo pipefail
@@ -69,7 +78,7 @@ jobs:
           APK_TAG="${TAG}-apt-android-7-github-debug"
           SRC="./app/build/outputs/apk/debug"
           DIST="./dist"
-          PREFIX="termux-app_${APK_TAG}"
+          PREFIX="neoterm_${APK_TAG}"
           mkdir -p "$DIST"
 
           export TERMUX_APK_VERSION_TAG="$APK_TAG"
@@ -91,9 +100,84 @@ jobs:
             cp "$APK" "$DIST/"
           done
 
+      - name: Zipalign and sign every release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
+          echo "Using build-tools $BUILD_TOOLS"
+
+          # Keystore precedence: configured release secret > exact keystore used by CI
+          # debug builds > Android's debug keystore. Never ship an unsigned APK.
+          KEYSTORE="/tmp/neoterm-release.jks"
+          if [ -n "${RELEASE_KEYSTORE_BASE64:-}" ]; then
+            echo "Signing with configured RELEASE_KEYSTORE secret"
+            printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE"
+            KS_ALIAS="${RELEASE_KEY_ALIAS:?RELEASE_KEY_ALIAS is required with RELEASE_KEYSTORE_BASE64}"
+            KS_PASS="${RELEASE_KEYSTORE_PASSWORD:?RELEASE_KEYSTORE_PASSWORD is required with RELEASE_KEYSTORE_BASE64}"
+            KEY_PASS="${RELEASE_KEY_PASSWORD:-$KS_PASS}"
+          elif [ -f app/testkey_untrusted.jks ]; then
+            echo "Signing with the CI debug keystore (same identity as debug_build.yml)"
+            cp app/testkey_untrusted.jks "$KEYSTORE"
+            KS_ALIAS="alias"
+            KS_PASS="xrj45yWGLbsO7W0v"
+            KEY_PASS="$KS_PASS"
+          else
+            echo "Signing with ~/.android/debug.keystore fallback"
+            cp "$HOME/.android/debug.keystore" "$KEYSTORE"
+            KS_ALIAS="androiddebugkey"
+            KS_PASS="android"
+            KEY_PASS="android"
+          fi
+
+          shopt -s nullglob
+          APK_LIST=(dist/*.apk)
+          if [ "${#APK_LIST[@]}" -eq 0 ]; then echo "No release APKs found"; exit 1; fi
+
+          for APK in "${APK_LIST[@]}"; do
+            echo "::group::Aligning and signing $APK"
+            "$ZIPALIGN" -f -p 4 "$APK" "$APK.aligned"
+            mv "$APK.aligned" "$APK"
+            "$APKSIGNER" sign \
+              --ks "$KEYSTORE" \
+              --ks-key-alias "$KS_ALIAS" \
+              --ks-pass "pass:$KS_PASS" \
+              --key-pass "pass:$KEY_PASS" \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              "$APK"
+            echo "::endgroup::"
+          done
+          rm -f "$KEYSTORE"
+
+      - name: Verify signatures and generate SHA256SUMS.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          APKSIGNER="$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner"
+
+          shopt -s nullglob
+          APK_LIST=(dist/*.apk)
+          if [ "${#APK_LIST[@]}" -eq 0 ]; then echo "No release APKs to verify"; exit 1; fi
+
+          for APK in "${APK_LIST[@]}"; do
+            echo "::group::apksigner verify --verbose $APK"
+            "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$APK.verify.txt"
+            # apksigner verify alone accepts a v1-only APK; require all three schemes
+            # explicitly so the broken publish from v1.0.0-glass cannot recur.
+            grep -q 'Verified using v1 scheme (JAR signing): true' "$APK.verify.txt"
+            grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' "$APK.verify.txt"
+            grep -q 'Verified using v3 scheme (APK Signature Scheme v3): true' "$APK.verify.txt"
+            echo "::endgroup::"
+          done
+
           echo "::group::Generate SHA256SUMS.txt"
-          (cd "$DIST" && sha256sum *.apk > SHA256SUMS.txt)
-          cat "$DIST/SHA256SUMS.txt"
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+          cat dist/SHA256SUMS.txt
           echo "::endgroup::"
 
       - name: Publish public release with auto-generated notes
