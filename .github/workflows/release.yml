@@ -101,8 +101,9 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ steps.meta.outputs.tag }}"
+          # Releases are public by default in gh; there is no --public flag.
           gh release create "$TAG" \
             --title "NeoTerm $TAG" \
             --generate-notes \
-            --public \
+            --verify-tag \
             dist/*.apk dist/SHA256SUMS.txt
