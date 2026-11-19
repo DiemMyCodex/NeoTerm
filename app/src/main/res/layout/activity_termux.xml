@@ -95,6 +95,24 @@
                             android:focusableInTouchMode="false"
                             tools:listitem="@layout/item_session_tab" />
 
+                        <!-- Live theme switcher. Chrome only: never takes focus from TerminalView. -->
+                        <ImageButton
+                            android:id="@+id/theme_switcher_button"
+                            android:layout_width="@dimen/neoterm_chevron_size"
+                            android:layout_height="@dimen/neoterm_chevron_size"
+                            android:layout_marginStart="0dp"
+                            android:layout_marginEnd="@dimen/neoterm_tab_gap"
+                            android:src="@drawable/ic_palette"
+                            android:background="@drawable/theme_button_background"
+                            android:scaleType="centerInside"
+                            android:padding="0dp"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            app:tint="@color/session_tab_add_icon"
+                            android:contentDescription="@string/action_switch_theme"
+                            android:focusable="false"
+                            android:focusableInTouchMode="false" />
+
                         <ImageButton
                             android:id="@+id/new_session_tab_button"
                             android:layout_width="@dimen/neoterm_chevron_size"

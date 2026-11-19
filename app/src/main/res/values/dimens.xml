@@ -34,4 +34,11 @@
     <dimen name="neoterm_dock_bottom_margin">8dp</dimen>
     <dimen name="neoterm_dock_elevation">8dp</dimen>
     <dimen name="neoterm_chevron_size">34dp</dimen>
+
+    <!-- Live theme switcher. -->
+    <dimen name="neoterm_theme_menu_width">220dp</dimen>
+    <dimen name="neoterm_theme_swatch_size">18dp</dimen>
+    <dimen name="neoterm_theme_swatch_radius">6dp</dimen>
+    <dimen name="neoterm_theme_swatch_overlap">-6dp</dimen>
+    <dimen name="neoterm_theme_check_size">18dp</dimen>
 </resources>

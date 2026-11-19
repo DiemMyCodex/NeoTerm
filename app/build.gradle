@@ -76,7 +76,11 @@ android {
                     (gradle.startParameter.taskNames.any { it.contains("Release") } && splitAPKsForReleaseBuilds == "1"))
                 reset ()
                 include 'arm64-v8a'
-                universalApk false
+                // Emit the single-file APK alongside the ARM64 split in one build. Disabling
+                // splits via TERMUX_SPLIT_APKS_FOR_DEBUG_BUILDS=0 would make AGP ignore the
+                // include list above and try to compile bootstrap-arm.zip for armeabi-v7a,
+                // which this ARM64-only fork does not ship.
+                universalApk true
             }
         }
     }

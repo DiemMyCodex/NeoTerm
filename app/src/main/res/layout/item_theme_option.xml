@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One theme row: dual swatch + name + check. Never steals terminal focus. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/theme_option_root"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/neoterm_menu_row_height"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="@dimen/neoterm_menu_horizontal_padding"
+    android:paddingEnd="@dimen/neoterm_menu_horizontal_padding"
+    android:background="?android:attr/selectableItemBackground"
+    android:descendantFocusability="blocksDescendants"
+    android:focusable="false"
+    android:focusableInTouchMode="false">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:descendantFocusability="blocksDescendants"
+        android:focusable="false"
+        android:focusableInTouchMode="false">
+
+        <View
+            android:id="@+id/theme_swatch_base"
+            android:layout_width="@dimen/neoterm_theme_swatch_size"
+            android:layout_height="@dimen/neoterm_theme_swatch_size"
+            android:background="@drawable/theme_swatch_background"
+            android:focusable="false"
+            android:focusableInTouchMode="false" />
+
+        <View
+            android:id="@+id/theme_swatch_accent"
+            android:layout_width="@dimen/neoterm_theme_swatch_size"
+            android:layout_height="@dimen/neoterm_theme_swatch_size"
+            android:layout_marginStart="@dimen/neoterm_theme_swatch_overlap"
+            android:background="@drawable/theme_swatch_background"
+            android:focusable="false"
+            android:focusableInTouchMode="false" />
+
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/theme_option_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="12dp"
+        android:textColor="@color/neoterm_tab_text_active"
+        android:textSize="14sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:focusable="false"
+        android:focusableInTouchMode="false" />
+
+    <ImageView
+        android:id="@+id/theme_option_check"
+        android:layout_width="@dimen/neoterm_theme_check_size"
+        android:layout_height="@dimen/neoterm_theme_check_size"
+        android:src="@drawable/ic_check"
+        android:scaleType="centerInside"
+        android:visibility="gone"
+        android:focusable="false"
+        android:focusableInTouchMode="false" />
+
+</LinearLayout>

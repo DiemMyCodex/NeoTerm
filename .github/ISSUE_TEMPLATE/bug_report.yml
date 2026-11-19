@@ -1,0 +1,56 @@
+name: "Bug report"
+description: "Report a NeoTerm UI, theme, or terminal regression"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please search existing issues first. If the problem is with a
+        **package installed inside the terminal** (apt/pkg), report it at
+        [termux/termux-packages](https://github.com/termux/termux-packages/issues) instead.
+
+        Issues without the requested details may be closed without a solution.
+  - type: textarea
+    attributes:
+      label: What happened?
+      description: A clear, concise description of the bug. Screenshots are welcome.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, including which theme and which UI action.
+      placeholder: |
+        1. Open NeoTerm with Tokyo Night active
+        2. Collapse the extra keys dock
+        3. Type in the terminal...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Active theme
+      options:
+        - OLED Obsidian
+        - Catppuccin Mocha
+        - Tokyo Night
+        - Dracula
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Environment
+      description: Device, Android version, and NeoTerm build/SHA-256 if known.
+      value: |
+        * NeoTerm version / APK SHA-256:
+        * Android OS version:
+        * Device model:
+        * Install source (Release / CI artifact / local build):
+    validations:
+      required: true
